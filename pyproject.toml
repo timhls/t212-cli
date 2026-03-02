@@ -8,10 +8,10 @@ authors = [
     { name = "Trading 212 CLI Contributors", email = "noreply@example.com" }
 ]
 dependencies = [
-    "typer>=0.9.0",
-    "pydantic>=2.0.0",
-    "httpx>=0.25.0",
-    "rich>=13.0.0"
+    "typer==0.24.1",
+    "pydantic==2.12.5",
+    "httpx==0.28.1",
+    "rich==14.3.3"
 ]
 
 [project.scripts]
@@ -23,14 +23,14 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-mock>=3.10.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5.0",
-    "python-semantic-release>=8.0.0",
-    "types-requests",
-    "bandit>=1.9.4",
-    "pytest-cov>=7.0.0",
+    "pytest==9.0.2",
+    "pytest-mock==3.15.1",
+    "ruff==0.15.4",
+    "mypy==1.19.1",
+    "python-semantic-release==9.21.1",
+    "types-requests==2.32.4.20260107",
+    "bandit==1.9.4",
+    "pytest-cov==7.0.0",
 ]
 
 [tool.ruff]
