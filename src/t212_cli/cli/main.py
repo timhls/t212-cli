@@ -177,3 +177,35 @@ def orders_market(ticker: str, quantity: float, extended_hours: bool = False) ->
         pretty_print(res)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+
+
+# === PIES ===
+@pies_app.command("list")
+def pies_list() -> None:
+    """Fetch all pies."""
+    client = get_client()
+    try:
+        pretty_print(client.get_pies())
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("get")
+def pies_get(pie_id: int) -> None:
+    """Fetch a pie by ID."""
+    client = get_client()
+    try:
+        pretty_print(client.get_pie_by_id(pie_id))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("delete")
+def pies_delete(pie_id: int) -> None:
+    """Delete a pie by ID."""
+    client = get_client()
+    try:
+        client.delete_pie(pie_id)
+        console.print(f"[green]Pie {pie_id} deleted.[/green]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
