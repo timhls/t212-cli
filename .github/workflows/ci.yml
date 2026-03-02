@@ -1,4 +1,4 @@
-name: Python CI Pipeline (Free Stack)
+name: Build and Test
 
 on:
   push:
