@@ -1,6 +1,11 @@
+from typing import Any
+from datetime import datetime
 import pytest
 from unittest.mock import patch, MagicMock
 from t212_cli.client.base import Trading212Client
+
+from t212_cli.models import ReportDataIncluded, TimeValidity, DividendCashAction
+from datetime import datetime, timezone
 from t212_cli.models import (
     LimitRequest,
     MarketRequest,
@@ -13,12 +18,12 @@ from t212_cli.models import (
 
 
 @pytest.fixture
-def client():
+def client() -> Trading212Client:
     return Trading212Client(api_key_id="test_key", secret_key="test_secret")
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_account_summary(mock_get, client):
+def test_get_account_summary(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {"id": 123, "currencyCode": "EUR"}
     mock_get.return_value = mock_response
@@ -29,7 +34,9 @@ def test_get_account_summary(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_historical_dividends(mock_get, client):
+def test_get_historical_dividends(
+    mock_get: MagicMock, client: Trading212Client
+) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {"items": [], "nextPagePath": None}
     mock_get.return_value = mock_response
@@ -42,7 +49,7 @@ def test_get_historical_dividends(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_historical_exports(mock_get, client):
+def test_get_historical_exports(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = [{"reportId": 1, "status": "Finished"}]
     mock_get.return_value = mock_response
@@ -53,20 +60,24 @@ def test_get_historical_exports(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_request_historical_export(mock_post, client):
+def test_request_historical_export(
+    mock_post: MagicMock, client: Trading212Client
+) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {"reportId": 1}
     mock_post.return_value = mock_response
 
     req = PublicReportRequest(
-        dataIncluded={"includeDividends": True}, timeFrom="2020", timeTo="2021"
+        dataIncluded=ReportDataIncluded(includeDividends=True),
+        timeFrom=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        timeTo=datetime(2021, 1, 1, tzinfo=timezone.utc),
     )
     result = client.request_historical_export(req)
     assert result.reportId == 1
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_historical_orders(mock_get, client):
+def test_get_historical_orders(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {"items": []}
     mock_get.return_value = mock_response
@@ -76,7 +87,9 @@ def test_get_historical_orders(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_historical_transactions(mock_get, client):
+def test_get_historical_transactions(
+    mock_get: MagicMock, client: Trading212Client
+) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {"items": []}
     mock_get.return_value = mock_response
@@ -86,7 +99,7 @@ def test_get_historical_transactions(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_exchanges(mock_get, client):
+def test_get_exchanges(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = [
         {"id": 1, "name": "NASDAQ", "workingSchedules": []}
@@ -99,7 +112,7 @@ def test_get_exchanges(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_instruments(mock_get, client):
+def test_get_instruments(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = [
         {
@@ -120,7 +133,7 @@ def test_get_instruments(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_orders(mock_get, client):
+def test_get_orders(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = [
         {
@@ -139,7 +152,7 @@ def test_get_orders(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_place_limit_order(mock_post, client):
+def test_place_limit_order(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "id": 1,
@@ -152,13 +165,15 @@ def test_place_limit_order(mock_post, client):
     }
     mock_post.return_value = mock_response
 
-    req = LimitRequest(ticker="AAPL", quantity=1, limitPrice=100, timeValidity="DAY")
+    req = LimitRequest(
+        ticker="AAPL", quantity=1, limitPrice=100, timeValidity=TimeValidity.DAY
+    )
     result = client.place_limit_order(req)
     assert result.id == 1
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_place_market_order(mock_post, client):
+def test_place_market_order(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "id": 1,
@@ -170,13 +185,13 @@ def test_place_market_order(mock_post, client):
     }
     mock_post.return_value = mock_response
 
-    req = MarketRequest(ticker="AAPL", quantity=1)
+    req = MarketRequest(ticker="AAPL", quantity=1, extendedHours=False)
     result = client.place_market_order(req)
     assert result.id == 1
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_place_stop_order(mock_post, client):
+def test_place_stop_order(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "id": 1,
@@ -189,13 +204,15 @@ def test_place_stop_order(mock_post, client):
     }
     mock_post.return_value = mock_response
 
-    req = StopRequest(ticker="AAPL", quantity=1, stopPrice=100, timeValidity="DAY")
+    req = StopRequest(
+        ticker="AAPL", quantity=1, stopPrice=100, timeValidity=TimeValidity.DAY
+    )
     result = client.place_stop_order(req)
     assert result.id == 1
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_place_stop_limit_order(mock_post, client):
+def test_place_stop_limit_order(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "id": 1,
@@ -210,20 +227,24 @@ def test_place_stop_limit_order(mock_post, client):
     mock_post.return_value = mock_response
 
     req = StopLimitRequest(
-        ticker="AAPL", quantity=1, stopPrice=100, limitPrice=100, timeValidity="DAY"
+        ticker="AAPL",
+        quantity=1,
+        stopPrice=100,
+        limitPrice=100,
+        timeValidity=TimeValidity.DAY,
     )
     result = client.place_stop_limit_order(req)
     assert result.id == 1
 
 
 @patch("t212_cli.client.base.httpx.delete")
-def test_cancel_order(mock_delete, client):
+def test_cancel_order(mock_delete: MagicMock, client: Trading212Client) -> None:
     client.cancel_order(1)
     mock_delete.assert_called_once()
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_order_by_id(mock_get, client):
+def test_get_order_by_id(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "id": 1,
@@ -240,7 +261,7 @@ def test_get_order_by_id(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_pies(mock_get, client):
+def test_get_pies(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = [{"id": 1, "progress": 0.5, "status": "AHEAD"}]
     mock_get.return_value = mock_response
@@ -250,7 +271,7 @@ def test_get_pies(mock_get, client):
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_create_pie(mock_post, client):
+def test_create_pie(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "settings": {"dividendCashAction": "REINVEST", "icon": "Default", "name": "P1"},
@@ -259,20 +280,26 @@ def test_create_pie(mock_post, client):
     mock_post.return_value = mock_response
 
     req = PieRequest(
-        dividendCashAction="REINVEST", icon="Default", name="P1", instrumentShares={}
+        dividendCashAction=DividendCashAction.REINVEST,
+        goal=0.0,
+        icon="Default",
+        name="P1",
+        instrumentShares={},
     )
     result = client.create_pie(req)
+    assert result is not None
+    assert result.settings is not None
     assert result.settings.name == "P1"
 
 
 @patch("t212_cli.client.base.httpx.delete")
-def test_delete_pie(mock_delete, client):
+def test_delete_pie(mock_delete: MagicMock, client: Trading212Client) -> None:
     client.delete_pie(1)
     mock_delete.assert_called_once()
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_pie_by_id(mock_get, client):
+def test_get_pie_by_id(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "settings": {"dividendCashAction": "REINVEST", "icon": "Default", "name": "P1"},
@@ -281,11 +308,13 @@ def test_get_pie_by_id(mock_get, client):
     mock_get.return_value = mock_response
 
     result = client.get_pie_by_id(1)
+    assert result is not None
+    assert result.settings is not None
     assert result.settings.name == "P1"
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_update_pie(mock_post, client):
+def test_update_pie(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "settings": {"dividendCashAction": "REINVEST", "icon": "Default", "name": "P1"},
@@ -294,14 +323,20 @@ def test_update_pie(mock_post, client):
     mock_post.return_value = mock_response
 
     req = PieRequest(
-        dividendCashAction="REINVEST", icon="Default", name="P1", instrumentShares={}
+        dividendCashAction=DividendCashAction.REINVEST,
+        goal=0.0,
+        icon="Default",
+        name="P1",
+        instrumentShares={},
     )
     result = client.update_pie(1, req)
+    assert result is not None
+    assert result.settings is not None
     assert result.settings.name == "P1"
 
 
 @patch("t212_cli.client.base.httpx.post")
-def test_duplicate_pie(mock_post, client):
+def test_duplicate_pie(mock_post: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "settings": {"dividendCashAction": "REINVEST", "icon": "Default", "name": "P1"},
@@ -311,11 +346,13 @@ def test_duplicate_pie(mock_post, client):
 
     req = DuplicateBucketRequest(icon="Default", name="P1")
     result = client.duplicate_pie(1, req)
+    assert result is not None
+    assert result.settings is not None
     assert result.settings.name == "P1"
 
 
 @patch("t212_cli.client.base.httpx.get")
-def test_get_positions(mock_get, client):
+def test_get_positions(mock_get: MagicMock, client: Trading212Client) -> None:
     mock_response = MagicMock()
     mock_response.json.return_value = [
         {
