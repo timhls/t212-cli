@@ -1,11 +1,10 @@
-from typing import Any
 from datetime import datetime
 import pytest
 from unittest.mock import patch, MagicMock
 from t212_cli.client.base import Trading212Client
 
 from t212_cli.models import ReportDataIncluded, TimeValidity, DividendCashAction
-from datetime import datetime, timezone
+from datetime import timezone
 from t212_cli.models import (
     LimitRequest,
     MarketRequest,

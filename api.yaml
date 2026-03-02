@@ -737,7 +737,7 @@ components:
       type: object
     TimeValidity:
       description: >-
-        Specifies how long the order remains active: 
+        Specifies how long the order remains active:
 
         * DAY: The order will automatically expire if not executed by midnight
         in the time zone of the instrument's exchange.
@@ -1337,7 +1337,7 @@ paths:
   /api/v0/equity/history/exports:
     get:
       description: |-
-        Retrieves a list of all requested CSV reports and their current status. 
+        Retrieves a list of all requested CSV reports and their current status.
 
 
         **Asynchronous Workflow:**
@@ -1677,9 +1677,9 @@ paths:
     post:
       description: |-
         Creates a new Market order, which is an instruction to trade a security
-        immediately at the next available price. 
+        immediately at the next available price.
 
-        - To place a **buy** order, use a positive `quantity`. 
+        - To place a **buy** order, use a positive `quantity`.
 
         - To place a **sell** order, use a negative `quantity`.
 
@@ -2115,7 +2115,7 @@ paths:
     post:
       deprecated: true
       description: |-
-        Duplicates a pie for the account 
+        Duplicates a pie for the account
 
         **Rate limit:** 1 req / 5s
       operationId: duplicatePie
