@@ -3,6 +3,6 @@
         "ms-python.python",
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
-        "matangover.mypy"
+        "ms-python.mypy-type-checker"
     ]
 }

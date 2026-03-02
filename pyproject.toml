@@ -43,5 +43,5 @@ ignore_missing_imports = true
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
-build_command = "uv build"
+build_command = "pip install uv && uv build"
 upload_to_vcs_release = true
