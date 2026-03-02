@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/timohulsmann/Repos/t212-cli/src/t212_cli/client"
+    ]
+  }
+}

@@ -22,7 +22,7 @@ class Trading212Client:
 
     def get_account_info(self) -> AccountSummary:
         response = httpx.get(
-            f"{self.BASE_URL}/equity/account/info", headers=self.headers
+            f"{self.BASE_URL}/equity/account/summary", headers=self.headers
         )
         response.raise_for_status()
         return AccountSummary(**response.json())
