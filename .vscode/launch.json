@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: CLI App",
+            "type": "python",
+            "request": "launch",
+            "module": "t212_cli.__main__",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--help"
+            ],
+            "env": {
+                "T212_API_KEY_ID": "${env:T212_API_KEY_ID}",
+                "T212_SECRET_KEY": "${env:T212_SECRET_KEY}"
+            }
+        },
+        {
+            "name": "Python: Pytest",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${workspaceFolder}/tests"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}
