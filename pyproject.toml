@@ -3,7 +3,7 @@ name = "t212-cli"
 version = "0.1.0"
 description = "A Python client and CLI for the Trading 212 API"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 authors = [
     { name = "Trading 212 CLI Contributors", email = "noreply@example.com" }
 ]
@@ -35,11 +35,11 @@ dev = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py314"
 
 [tool.mypy]
 strict = true
-python_version = "3.11"
+python_version = "3.14"
 ignore_missing_imports = true
 
 [tool.semantic_release]
