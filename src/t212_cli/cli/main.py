@@ -4,7 +4,7 @@ import os
 import json
 from rich.console import Console
 from t212_cli.client.base import Trading212Client
-from t212_cli.models import MarketRequest
+from t212_cli.models import MarketRequest, PieRequest, DuplicateBucketRequest
 
 app = typer.Typer(help="Trading 212 CLI")
 console = Console()
@@ -207,5 +207,107 @@ def pies_delete(pie_id: int) -> None:
     try:
         client.delete_pie(pie_id)
         console.print(f"[green]Pie {pie_id} deleted.[/green]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("create")
+def pies_create(
+    payload: str = typer.Argument(
+        ..., help='JSON string or path to JSON file. Example: {"name": "Tech"}'
+    ),
+) -> None:
+    """Create a new pie from a JSON payload.
+
+    The payload must match the PieRequest schema.
+    Example JSON:
+    {
+      "dividendCashAction": "REINVEST",
+      "endDate": "2025-12-31T23:59:59Z",
+      "goal": 10000.0,
+      "icon": "Default",
+      "instrumentShares": {
+        "AAPL_US_EQ": 0.5,
+        "MSFT_US_EQ": 0.5
+      },
+      "name": "My Tech Pie"
+    }
+    """
+    client = get_client()
+    try:
+        if os.path.exists(payload):
+            with open(payload, "r") as f:
+                data = json.load(f)
+        else:
+            data = json.loads(payload)
+
+        req = PieRequest(**data)
+        pretty_print(client.create_pie(req))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("update")
+def pies_update(
+    pie_id: int,
+    payload: str = typer.Argument(
+        ..., help='JSON string or path to JSON file. Example: {"name": "Tech"}'
+    ),
+) -> None:
+    """Update an existing pie by ID using a JSON payload.
+
+    The payload must match the PieRequest schema.
+    Example JSON:
+    {
+      "dividendCashAction": "REINVEST",
+      "goal": 15000.0,
+      "icon": "Default",
+      "instrumentShares": {
+        "AAPL_US_EQ": 0.6,
+        "MSFT_US_EQ": 0.4
+      },
+      "name": "My Updated Tech Pie"
+    }
+    """
+    client = get_client()
+    try:
+        if os.path.exists(payload):
+            with open(payload, "r") as f:
+                data = json.load(f)
+        else:
+            data = json.loads(payload)
+
+        req = PieRequest(**data)
+        pretty_print(client.update_pie(pie_id, req))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("duplicate")
+def pies_duplicate(
+    pie_id: int,
+    payload: str = typer.Argument(
+        ..., help='JSON string or path to JSON file. Example: {"name": "Tech Copy"}'
+    ),
+) -> None:
+    """Duplicate an existing pie by ID using a JSON payload.
+
+    The payload must match the DuplicateBucketRequest schema.
+    Example JSON:
+    {
+      "icon": "Default",
+      "name": "Copy of Tech Pie"
+    }
+    """
+    client = get_client()
+    try:
+        if os.path.exists(payload):
+            with open(payload, "r") as f:
+                data = json.load(f)
+        else:
+            data = json.loads(payload)
+
+        req = DuplicateBucketRequest(**data)
+        pretty_print(client.duplicate_pie(pie_id, req))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
