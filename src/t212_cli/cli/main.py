@@ -5,6 +5,7 @@ import json
 from rich.console import Console
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import MarketRequest, PieRequest, DuplicateBucketRequest
+from t212_cli.cli.tax import app as tax_app
 
 app = typer.Typer(help="Trading 212 CLI")
 console = Console()
@@ -24,6 +25,7 @@ app.add_typer(metadata_app, name="metadata")
 app.add_typer(orders_app, name="orders")
 app.add_typer(pies_app, name="pies")
 app.add_typer(positions_app, name="positions")
+app.add_typer(tax_app, name="tax")
 
 
 def get_client() -> Trading212Client:
