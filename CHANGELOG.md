@@ -2,6 +2,98 @@
 
 
 
+## v0.2.0 (2026-03-04)
+
+### Build
+
+* build: install and configure pre-commit hooks ([`7968092`](https://github.com/timhls/t212-cli/commit/79680922739784c05d08ee0028e7d4f59a631c85))
+
+* build: fix absolute python path in .python-version
+
+- Change .python-version from an absolute local path (`/opt/homebrew/bin/python3.14`) to `3.14`.
+- This fixes CI workflows where the specific macOS homebrew path does not exist.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`3d2d846`](https://github.com/timhls/t212-cli/commit/3d2d846ca3a8cc2caebf16b603c35151c2ebd452))
+
+* build: update Python target version to 3.14
+
+- Pin Python version to 3.14.3 using `uv python pin`.
+- Update `requires-python` constraint to `&gt;=3.14` in `pyproject.toml`.
+- Configure Ruff and Mypy to target Python 3.14.
+- Update GitHub Actions `ci.yml` to use `python-version: &#39;3.14&#39;`.
+- Resync `uv.lock` with updated constraints and newer wheels matching the new interpreter.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`e9b634a`](https://github.com/timhls/t212-cli/commit/e9b634a496b195eaaeead72b5cc43be2ca3643a7))
+
+### Ci
+
+* ci: rename CI workflow and update gitignore
+
+- Rename CI pipeline from &#34;Python CI Pipeline (Free Stack)&#34; to &#34;Build and Test&#34;.
+- Add coverage.xml and .coverage to .gitignore to prevent committing coverage reports.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`517e465`](https://github.com/timhls/t212-cli/commit/517e465c25141974a3ba8b382cf5acfc3e32425e))
+
+* ci: adapt and integrate new Python CI Pipeline
+
+- Replaced basic CI pipeline with the provided &#34;Python CI Pipeline (Free Stack)&#34;
+- Adapted the pipeline to use `uv` for dependency management instead of `pip`.
+- Added `pytest-cov` and `bandit` to dev dependencies in `pyproject.toml`.
+- Configured Bandit to scan the `src` directory directly and Pytest to measure coverage of `src`.
+- Maintained the existing `mypy` step alongside `ruff` linting and formatting.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`6953c0d`](https://github.com/timhls/t212-cli/commit/6953c0dedcd59b01333273fd2c507e35a357e637))
+
+### Documentation
+
+* docs: update README.md and add CLAUDE.md
+
+- Rewrite README.md with comprehensive Features, Installation, Setup, Usage, and Development sections.
+- Update Setup section to reflect requirement for both T212_API_KEY_ID and T212_SECRET_KEY.
+- Add CLAUDE.md to establish context engineering guidelines for LLM agents.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`8069e26`](https://github.com/timhls/t212-cli/commit/8069e26ad993635581d7fbfb1593e0556a7604e2))
+
+### Feature
+
+* feat(tax): implement German tax reporting module with auto-classification
+
+- Add `tax` command group to CLI
+- Implement `TaxInstrument` and `AssetClass` models
+- Add `config` manager for persistent local tax settings (`~/.t212/tax_config.yml`)
+- Implement `scrape_finanzfluss` using `curl_cffi` to auto-detect ETF/ETC tax status
+- Add `market_data` module using `yfinance` for historical prices
+- Register `t212 tax` subcommand in main CLI entrypoint
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`de7c4ed`](https://github.com/timhls/t212-cli/commit/de7c4ed4260f8d41fac224b6298b2eb68987b771))
+
+### Style
+
+* style: format test files with ruff
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`b082c53`](https://github.com/timhls/t212-cli/commit/b082c53920a904778ad4f11556299752b57ec3c5))
+
+### Test
+
+* test: fix mypy typing errors in test files
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`3d6fd1e`](https://github.com/timhls/t212-cli/commit/3d6fd1e4831dc49f5b27a61a6668ad70a94a870a))
+
+* test: fix ruff linting error
+
+- Remove unused `json` import in `tests/test_cli/test_cli_main.py` which was causing the CI pipeline to fail during the Ruff check.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`554afdd`](https://github.com/timhls/t212-cli/commit/554afddcdc2b9497ac05c072cea53a53eeabbe70))
+
+* test: increase test coverage to 99% and pin dependencies
+
+- Add tests for cli main and client base to achieve 99% coverage
+- Pin all dependencies in pyproject.toml to exact versions
+- Sync uv.lock with pinned dependencies
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`6b445ad`](https://github.com/timhls/t212-cli/commit/6b445ad264f2cfadf9d6ad6132fd8b4bc2c1435a))
+
+
 ## v0.1.0 (2026-03-02)
 
 ### Build
