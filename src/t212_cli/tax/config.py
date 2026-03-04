@@ -11,12 +11,11 @@ def load_tax_config() -> TaxConfig:
     if not CONFIG_FILE.exists():
         return TaxConfig()
 
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-
     try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
         return TaxConfig(**data)
-    except ValidationError:
+    except ValidationError, yaml.YAMLError:
         # Fallback if corrupt
         return TaxConfig()
 
