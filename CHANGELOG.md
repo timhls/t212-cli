@@ -2,6 +2,27 @@
 
 
 
+## v0.3.0 (2026-03-04)
+
+### Feature
+
+* feat(tax): implement FIFO engine and wire to `fifo-report` command
+
+- Implement `FifoEngine` state machine in `calculator.py`
+  - Handles tranches, partial sales, and Anschaffungsnebenkosten (fees)
+  - Applies ETF Teilfreistellung (TFS) automatically based on local config
+  - Segregates losses into Aktienverlusttopf and Allgemeiner Verlusttopf (§20 Abs. 6 EStG)
+  - Adds target year tracking logic for localized reports
+- Update `t212 tax fifo-report`:
+  - Fetch all paginated historical orders from Trading 212 API
+  - Auto-classify unknown ISINs silently via Finanzfluss scraper
+  - Generate chronologically sorted `TaxEvent` inputs for the FiFo engine
+  - Print beautiful Rich tables summarizing Net Taxable Gains and Loss Buckets for the target year
+- Fix Mypy static typing issues
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`7fff6c5`](https://github.com/timhls/t212-cli/commit/7fff6c5304d7e5c3896eccc619eb5ee8b8296695))
+
+
 ## v0.2.0 (2026-03-04)
 
 ### Build
