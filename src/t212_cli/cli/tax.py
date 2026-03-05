@@ -1,5 +1,7 @@
 import typer
 import os
+import datetime
+import urllib.parse
 from rich.console import Console
 from rich.table import Table
 from t212_cli.tax.config import (
@@ -96,8 +98,6 @@ def generate_fifo_report(year: int = 2024) -> None:
             # T212 API returns a string like "/api/v0/equity/history/orders?cursor=xxxx"
             # Let's extract the cursor from nextPagePath
             try:
-                import urllib.parse
-
                 parsed_url = urllib.parse.urlparse(res.nextPagePath)
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 cursor_str = query_params.get("cursor", [None])[0]
@@ -108,8 +108,6 @@ def generate_fifo_report(year: int = 2024) -> None:
                 break
 
     console.print(f"[green]Loaded {len(all_orders)} historical orders.[/green]")
-
-    import datetime
 
     def get_order_date(x: HistoricalOrder) -> datetime.datetime:
         if x.fill and x.fill.filledAt:
