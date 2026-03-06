@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
+import base64
+
 import pytest
 from unittest.mock import patch, MagicMock
 from t212_cli.client.base import Trading212Client
 
 from t212_cli.models import ReportDataIncluded, TimeValidity, DividendCashAction
-from datetime import timezone
 from t212_cli.models import (
     LimitRequest,
     MarketRequest,
@@ -19,6 +20,88 @@ from t212_cli.models import (
 @pytest.fixture
 def client() -> Trading212Client:
     return Trading212Client(api_key_id="test_key", secret_key="test_secret")
+
+
+def test_client_authorization_header() -> None:
+    """Validate that the Authorization header uses correct Basic auth (base64-encoded key:secret)."""
+    api_key = "my_api_key"
+    secret = "my_secret"
+    client = Trading212Client(api_key_id=api_key, secret_key=secret)
+
+    expected_credentials = base64.b64encode(f"{api_key}:{secret}".encode()).decode()
+    expected_header = f"Basic {expected_credentials}"
+
+    assert client.headers["Authorization"] == expected_header
+
+
+def test_client_accept_header() -> None:
+    """Validate that the Accept header is set to application/json."""
+    client = Trading212Client(api_key_id="k", secret_key="s")
+    assert client.headers["Accept"] == "application/json"
+
+
+@patch("t212_cli.client.base.httpx.get")
+def test_get_request_uses_correct_url(
+    mock_get: MagicMock, client: Trading212Client
+) -> None:
+    """Validate the full URL is constructed correctly from the base URL and endpoint."""
+    mock_get.return_value = MagicMock()
+    mock_get.return_value.json.return_value = {"id": 1, "currencyCode": "EUR"}
+
+    client.get_account_summary()
+
+    args, kwargs = mock_get.call_args
+    called_url = args[0]
+    assert called_url == "https://live.trading212.com/api/v0/equity/account/summary"
+
+
+@patch("t212_cli.client.base.httpx.get")
+def test_get_request_sends_authorization_header(
+    mock_get: MagicMock, client: Trading212Client
+) -> None:
+    """Validate that GET requests include the Authorization header."""
+    mock_get.return_value = MagicMock()
+    mock_get.return_value.json.return_value = {"id": 1, "currencyCode": "EUR"}
+
+    client.get_account_summary()
+
+    _, kwargs = mock_get.call_args
+    assert "Authorization" in kwargs["headers"]
+    assert kwargs["headers"]["Authorization"].startswith("Basic ")
+
+
+@patch("t212_cli.client.base.httpx.post")
+def test_post_request_sends_authorization_header(
+    mock_post: MagicMock, client: Trading212Client
+) -> None:
+    """Validate that POST requests include the Authorization header."""
+    mock_post.return_value = MagicMock()
+    mock_post.return_value.json.return_value = {"reportId": 1}
+
+    req = PublicReportRequest(
+        dataIncluded=ReportDataIncluded(includeDividends=True),
+        timeFrom=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        timeTo=datetime(2021, 1, 1, tzinfo=timezone.utc),
+    )
+    client.request_historical_export(req)
+
+    _, kwargs = mock_post.call_args
+    assert "Authorization" in kwargs["headers"]
+    assert kwargs["headers"]["Authorization"].startswith("Basic ")
+
+
+@patch("t212_cli.client.base.httpx.delete")
+def test_delete_request_sends_authorization_header(
+    mock_delete: MagicMock, client: Trading212Client
+) -> None:
+    """Validate that DELETE requests include the Authorization header."""
+    mock_delete.return_value = MagicMock()
+
+    client.cancel_order(42)
+
+    _, kwargs = mock_delete.call_args
+    assert "Authorization" in kwargs["headers"]
+    assert kwargs["headers"]["Authorization"].startswith("Basic ")
 
 
 @patch("t212_cli.client.base.httpx.get")

@@ -197,3 +197,140 @@ def test_fifo_engine_etf_loss(mock_get_config: MagicMock) -> None:
 
     assert engine.sonstige_verlusttopf == 70.0
     assert engine.year_sonstige_verlust_generated == 70.0
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_fifo_engine_multi_tranche_sell(mock_get_config: MagicMock) -> None:
+    """FIFO matching correctly consumes the oldest tranche first across multiple buy tranches."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIEN, tfs_quote=0.0
+    )
+    engine = FifoEngine(target_year=2024)
+
+    # First buy: 5 shares @ 100 EUR
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2023, 1, 1),
+            type="BUY",
+            isin="US1234",
+            quantity=5.0,
+            price_eur=100.0,
+        )
+    )
+    # Second buy: 5 shares @ 200 EUR
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2023, 6, 1),
+            type="BUY",
+            isin="US1234",
+            quantity=5.0,
+            price_eur=200.0,
+        )
+    )
+
+    assert len(engine.inventory["US1234"]) == 2
+
+    # Sell 7 shares @ 300 EUR each
+    # FIFO: consumes all 5 from tranche 1 and 2 from tranche 2
+    # Gain from tranche 1: 5 * (300 - 100) = 1000
+    # Gain from tranche 2: 2 * (300 - 200) = 200
+    # Total gain = 1200 EUR
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2024, 1, 1),
+            type="SELL",
+            isin="US1234",
+            quantity=7.0,
+            price_eur=300.0,
+        )
+    )
+
+    # 3 shares remain from tranche 2
+    assert len(engine.inventory["US1234"]) == 1
+    assert engine.inventory["US1234"][0].quantity == 3.0
+    assert engine.inventory["US1234"][0].price_eur == 200.0
+
+    assert engine.taxable_gains == 1200.0
+    assert engine.year_taxable_gains == 1200.0
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_fifo_engine_sonstige_gain_does_not_use_aktien_bucket(
+    mock_get_config: MagicMock,
+) -> None:
+    """Sonstige (non-Aktien) gains must not consume the aktien_verlusttopf."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIENFONDS, tfs_quote=0.0
+    )
+    engine = FifoEngine(target_year=2024)
+    engine.aktien_verlusttopf = 500.0
+    engine.sonstige_verlusttopf = 0.0
+
+    # Buy 1 share @ 100 EUR (ETF / Aktienfonds)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2024, 1, 1),
+            type="BUY",
+            isin="ETF1",
+            quantity=1.0,
+            price_eur=100.0,
+        )
+    )
+    # Sell 1 share @ 300 EUR -> gain = 200 EUR
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2024, 6, 1),
+            type="SELL",
+            isin="ETF1",
+            quantity=1.0,
+            price_eur=300.0,
+        )
+    )
+
+    # aktien_verlusttopf must remain untouched for non-Aktien gains
+    assert engine.aktien_verlusttopf == 500.0
+    assert engine.taxable_gains == 200.0
+    assert engine.year_taxable_gains == 200.0
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_fifo_engine_year_taxable_gains_isolation(mock_get_config: MagicMock) -> None:
+    """year_taxable_gains only accumulates gains from the target year, not prior years."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIEN, tfs_quote=0.0
+    )
+    engine = FifoEngine(target_year=2024)
+
+    # Buy shares in 2022
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2022, 1, 1),
+            type="BUY",
+            isin="US9999",
+            quantity=10.0,
+            price_eur=50.0,
+        )
+    )
+    # Sell half in 2023 (outside target year) -> gain = 5 * (100 - 50) = 250
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2023, 6, 1),
+            type="SELL",
+            isin="US9999",
+            quantity=5.0,
+            price_eur=100.0,
+        )
+    )
+    # Sell remainder in 2024 (target year) -> gain = 5 * (150 - 50) = 500
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2024, 3, 1),
+            type="SELL",
+            isin="US9999",
+            quantity=5.0,
+            price_eur=150.0,
+        )
+    )
+
+    assert engine.taxable_gains == 750.0  # 250 + 500 cumulative
+    assert engine.year_taxable_gains == 500.0  # only target-year gain
