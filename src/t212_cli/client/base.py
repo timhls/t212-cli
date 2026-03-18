@@ -25,11 +25,13 @@ from t212_cli.models import (
 
 
 class Trading212Client:
-    BASE_URL = "https://live.trading212.com/api/v0"
+    DEMO_URL = "https://demo.trading212.com/api/v0"
+    LIVE_URL = "https://live.trading212.com/api/v0"
 
-    def __init__(self, api_key_id: str, secret_key: str):
+    def __init__(self, api_key_id: str, secret_key: str, base_url: str = DEMO_URL):
         self.api_key_id = api_key_id
         self.secret_key = secret_key
+        self.base_url = base_url
 
         credentials_string = f"{api_key_id}:{secret_key}"
         encoded_credentials = base64.b64encode(
@@ -44,7 +46,7 @@ class Trading212Client:
     def _get(
         self, endpoint: str, params: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
-        url = f"{self.BASE_URL}{endpoint}"
+        url = f"{self.base_url}{endpoint}"
         response = httpx.get(url, headers=self.headers, params=params)
         response.raise_for_status()
         return response
@@ -52,13 +54,13 @@ class Trading212Client:
     def _post(
         self, endpoint: str, json_data: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
-        url = f"{self.BASE_URL}{endpoint}"
+        url = f"{self.base_url}{endpoint}"
         response = httpx.post(url, headers=self.headers, json=json_data)
         response.raise_for_status()
         return response
 
     def _delete(self, endpoint: str) -> httpx.Response:
-        url = f"{self.BASE_URL}{endpoint}"
+        url = f"{self.base_url}{endpoint}"
         response = httpx.delete(url, headers=self.headers)
         response.raise_for_status()
         return response

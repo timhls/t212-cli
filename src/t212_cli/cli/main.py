@@ -10,6 +10,19 @@ from t212_cli.cli.tax import app as tax_app
 app = typer.Typer(help="Trading 212 CLI")
 console = Console()
 
+state = {"live": False}
+
+
+@app.callback()
+def main(
+    live: bool = typer.Option(
+        False, "--live", help="Use live account instead of demo account"
+    ),
+) -> None:
+    if live:
+        state["live"] = True
+
+
 account_app = typer.Typer(help="Account summary and commands")
 history_app = typer.Typer(
     help="Historical events (dividends, exports, orders, transactions)"
@@ -38,7 +51,10 @@ def get_client() -> Trading212Client:
         )
         raise typer.Exit(code=1)
 
-    return Trading212Client(api_key_id=api_key_id, secret_key=secret_key)
+    base_url = Trading212Client.LIVE_URL if state["live"] else Trading212Client.DEMO_URL
+    return Trading212Client(
+        api_key_id=api_key_id, secret_key=secret_key, base_url=base_url
+    )
 
 
 def pretty_print(model: Any) -> None:

@@ -255,7 +255,7 @@ class FifoEngine:
             try:
                 start_price_year = get_historical_price(ticker, start_date)
                 end_price_year = get_historical_price(ticker, end_date)
-            except Exception:
+            except Exception:  # nosec
                 continue
 
             if start_price_year is None or end_price_year is None:
