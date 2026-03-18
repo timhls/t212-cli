@@ -2,6 +2,50 @@
 
 
 
+## v0.4.0 (2026-03-18)
+
+### Chore
+
+* chore(vscode): remove python.defaultInterpreterPath
+
+Removes the `python.defaultInterpreterPath` setting from VS Code workspace settings. This setting was causing unresolvable path warnings in the new Python Environment Tools (PET) discovery process. The Python extension now successfully auto-discovers the `.venv` environment anyway.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt; ([`b17cc65`](https://github.com/timhls/t212-cli/commit/b17cc657b5b5444e6694de4723e416503da9991a))
+
+### Feature
+
+* feat: default to demo environment and add --live flag ([`8335e20`](https://github.com/timhls/t212-cli/commit/8335e20858de4b12f06125552bc4dd7d108bb3af))
+
+### Fix
+
+* fix: add calculator fix ([`d7977ba`](https://github.com/timhls/t212-cli/commit/d7977ba919dce9ba51c899df55a051b753a1faac))
+
+### Test
+
+* test: fix mypy typing errors in test files ([`b95b8a7`](https://github.com/timhls/t212-cli/commit/b95b8a7896d962fd5e32dd78f3af0f1ae1a56665))
+
+### Unknown
+
+* Merge pull request #1 from timhls/copilot/validate-trading-212-api-usage
+
+Validate Trading 212 API usage and fix tax calculation test coverage ([`ee23abd`](https://github.com/timhls/t212-cli/commit/ee23abd01cca6e3fc19937abe8692b20400883a4))
+
+* Validate API usage and verify tax calculation accuracy
+
+- Fix non-standard Python 3 except syntax in config.py: use (E1, E2) tuple form
+- Move module-level imports out of function body in cli/tax.py
+- Add API client tests: validate Basic auth header encoding, Accept header, URL construction, and auth header presence on GET/POST/DELETE
+- Add tax calculator tests: multi-tranche FIFO sell, sonstige gains do not consume aktien_verlusttopf, year_taxable_gains isolation
+
+Co-authored-by: timhls &lt;11960973+timhls@users.noreply.github.com&gt; ([`9bf929f`](https://github.com/timhls/t212-cli/commit/9bf929f710909228f1e7eeb9d02565bd92a7195b))
+
+* Initial plan (no code changes yet)
+
+Co-authored-by: timhls &lt;11960973+timhls@users.noreply.github.com&gt; ([`784a454`](https://github.com/timhls/t212-cli/commit/784a4549efd116a6ffc5e0b83685419c99f18694))
+
+* Initial plan ([`38c9710`](https://github.com/timhls/t212-cli/commit/38c97102bc6526199bbd5d9bdc75125cfbfecf4c))
+
+
 ## v0.3.0 (2026-03-04)
 
 ### Feature

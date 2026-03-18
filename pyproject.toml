@@ -1,6 +1,6 @@
 [project]
 name = "t212-cli"
-version = "0.3.0"
+version = "0.4.0"
 description = "A Python client and CLI for the Trading 212 API"
 readme = "README.md"
 requires-python = ">=3.14"
