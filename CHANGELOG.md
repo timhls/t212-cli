@@ -2,6 +2,34 @@
 
 
 
+## v1.0.0 (2026-03-26)
+
+### Breaking
+
+* refactor!: replace --live flag with T212_BASE_URL environment variable
+
+Replace the --live command-line flag with T212_BASE_URL environment
+variable for more flexible API endpoint configuration. The client now
+reads the base URL from the environment variable and defaults to the
+demo API if not set.
+
+Changes:
+- Remove --live flag and state dictionary from CLI
+- Update Trading212Client to read T212_BASE_URL env var
+- Default to demo URL (https://demo.trading212.com/api/v0)
+- Update all tests to support new configuration approach
+- Update documentation (README, AGENTS.md, CLAUDE.md, copilot-instructions)
+- Add new tests for environment variable precedence
+
+Migration:
+  Old: t212 --live account summary
+  New: T212_BASE_URL=https://live.trading212.com/api/v0 t212 account summary
+
+BREAKING CHANGE: The --live command-line flag has been removed. Users must now set the T212_BASE_URL environment variable to use the live API. The default behavior now uses the demo API for safety.
+
+Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt; ([`03806da`](https://github.com/timhls/t212-cli/commit/03806da45cb08de9e799896aa9ddf7b13a5d10c5))
+
+
 ## v0.5.0 (2026-03-26)
 
 ### Documentation
