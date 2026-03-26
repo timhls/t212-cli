@@ -38,11 +38,23 @@ The CLI requires a Trading 212 API key ID and secret key. You can provide these 
 
 2. **Configuration File**: A configuration file located at `~/.config/t212-cli/config.json` (or `%APPDATA%\t212-cli\config.json` on Windows).
 
-By default, the CLI connects to the **Live** API (`live.trading212.com`). To use the **Demo** or **Practice** API (`demo.trading212.com`), set the `T212_API_ENV` environment variable:
+### API Environment Selection
+
+By default, the CLI connects to the **Demo** API (`https://demo.trading212.com/api/v0`), which is safe for testing without risking real money.
+
+To use the **Live** API with real money, set the `T212_BASE_URL` environment variable:
 
 ```bash
-export T212_API_ENV="demo"
+export T212_BASE_URL="https://live.trading212.com/api/v0"
 ```
+
+You can also set a custom API endpoint if needed:
+
+```bash
+export T212_BASE_URL="https://custom.trading212.com/api/v0"
+```
+
+**⚠️ Warning**: Always test your commands with the demo API first before using the live API to avoid unintended trades or account changes.
 
 ## Usage
 

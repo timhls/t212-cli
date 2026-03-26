@@ -20,5 +20,6 @@ This project is built with Python and uses `uv` for dependency management, virtu
 
 ### Important Notes
 - The CLI requires `T212_API_KEY_ID` and `T212_SECRET_KEY` for authentication.
+- Optional: Set `T212_BASE_URL` to specify API endpoint (defaults to demo: `https://demo.trading212.com/api/v0`).
 - For detailed usage examples and setup instructions, please refer to the [README.md](README.md).
 - Releases are automated via `python-semantic-release` using conventional commits.

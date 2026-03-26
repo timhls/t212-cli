@@ -73,4 +73,8 @@ We use `uv` exclusively for running all commands. Do not use standard `pip` or `
 
 ## 5. Security & Credentials
 - **Never** hardcode API keys or sensitive data.
-- The application relies on `T212_API_KEY_ID` and `T212_SECRET_KEY` environment variables. Mock these in tests rather than requiring real keys.
+- The application relies on these environment variables:
+  - `T212_API_KEY_ID`: Trading 212 API key ID
+  - `T212_SECRET_KEY`: Trading 212 secret key
+  - `T212_BASE_URL`: Optional, specify API endpoint URL (defaults to demo: `https://demo.trading212.com/api/v0`)
+- Mock these in tests rather than requiring real keys.

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import base64
+import os
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -19,7 +20,9 @@ from t212_cli.models import (
 
 @pytest.fixture
 def client() -> Trading212Client:
-    return Trading212Client(api_key_id="test_key", secret_key="test_secret")
+    """Create a client with demo URL (default when env var not set)."""
+    with patch.dict(os.environ, {}, clear=True):
+        return Trading212Client(api_key_id="test_key", secret_key="test_secret")
 
 
 def test_client_authorization_header() -> None:
@@ -52,7 +55,7 @@ def test_get_request_uses_correct_url(
 
     args, kwargs = mock_get.call_args
     called_url = args[0]
-    assert called_url == "https://live.trading212.com/api/v0/equity/account/summary"
+    assert called_url == "https://demo.trading212.com/api/v0/equity/account/summary"
 
 
 @patch("t212_cli.client.base.httpx.get")

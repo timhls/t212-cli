@@ -1,5 +1,6 @@
 import httpx
 import base64
+import os
 from typing import Optional, List, Any
 from t212_cli.models import (
     AccountSummary,
@@ -28,10 +29,13 @@ class Trading212Client:
     DEMO_URL = "https://demo.trading212.com/api/v0"
     LIVE_URL = "https://live.trading212.com/api/v0"
 
-    def __init__(self, api_key_id: str, secret_key: str, base_url: str = DEMO_URL):
+    def __init__(
+        self, api_key_id: str, secret_key: str, base_url: Optional[str] = None
+    ):
         self.api_key_id = api_key_id
         self.secret_key = secret_key
-        self.base_url = base_url
+        # Use provided base_url, or T212_BASE_URL env var, or default to DEMO_URL
+        self.base_url = base_url or os.environ.get("T212_BASE_URL", self.DEMO_URL)
 
         credentials_string = f"{api_key_id}:{secret_key}"
         encoded_credentials = base64.b64encode(

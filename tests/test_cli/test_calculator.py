@@ -5,7 +5,7 @@ from t212_cli.tax.calculator import FifoEngine, TaxEvent
 from t212_cli.tax.models import AssetClass, TaxInstrument
 
 
-def test_vorabpauschale():
+def test_vorabpauschale() -> None:
     engine = FifoEngine()
 
     # Mock instrument config
@@ -60,7 +60,7 @@ def test_vorabpauschale():
         assert abs(engine.taxable_gains - 133.440125) < 0.001
 
 
-def test_dividends():
+def test_dividends() -> None:
     engine = FifoEngine()
 
     with patch("t212_cli.tax.calculator.get_instrument_config") as mock_config:
@@ -85,7 +85,7 @@ def test_dividends():
         assert engine.anrechenbare_quellensteuer == 15.0
 
 
-def test_interest():
+def test_interest() -> None:
     engine = FifoEngine()
 
     int_event = TaxEvent(
@@ -101,7 +101,7 @@ def test_interest():
     # Does not have TFS, full amount goes to taxable_gains
 
 
-def test_physical_etc():
+def test_physical_etc() -> None:
     engine = FifoEngine()
 
     with patch("t212_cli.tax.calculator.get_instrument_config") as mock_config:
@@ -149,7 +149,7 @@ def test_physical_etc():
         assert engine.taxable_gains == 0.0  # Tax free!
 
 
-def test_final_tax():
+def test_final_tax() -> None:
     engine = FifoEngine()
 
     engine.taxable_gains = 11000.0

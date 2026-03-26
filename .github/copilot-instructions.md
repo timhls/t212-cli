@@ -79,6 +79,7 @@ This creates command hierarchies like: `t212 account summary`, `t212 orders list
 - Uses Basic Auth with Base64-encoded `api_key_id:secret_key`
 - Provides `_get()`, `_post()`, `_delete()` helper methods
 - Has `DEMO_URL` and `LIVE_URL` constants for API environments
+- Base URL is determined by `T212_BASE_URL` environment variable (defaults to demo)
 - Returns typed Pydantic models from all methods
 
 CLI commands should:
@@ -145,7 +146,7 @@ Key concept: `get_instrument_config(isin)` returns cached or fetched instrument 
 - Authentication uses environment variables:
   - `T212_API_KEY_ID`: Trading 212 API key ID
   - `T212_SECRET_KEY`: Trading 212 secret key
-  - `T212_API_ENV`: Optional, set to `"demo"` for demo API (defaults to live)
+  - `T212_BASE_URL`: Optional, specify API endpoint URL (defaults to demo: `https://demo.trading212.com/api/v0`)
 - Mock credentials in tests rather than requiring real keys
 
 ## Dependencies
