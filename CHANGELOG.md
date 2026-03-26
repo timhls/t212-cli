@@ -2,6 +2,26 @@
 
 
 
+## v0.5.0 (2026-03-26)
+
+### Documentation
+
+* docs: add AI agent guidelines (AGENTS.md) ([`0754a61`](https://github.com/timhls/t212-cli/commit/0754a61608a991b2e438d8a605070d585b56c225))
+
+### Feature
+
+* feat: add GitHub Copilot instructions file
+
+Add comprehensive developer guide for Copilot sessions including:
+- Build, test, and lint commands with uv
+- Architecture overview of CLI structure with Typer sub-apps
+- Client and tax module organization
+- Code conventions and typing requirements
+- Security practices and release process
+
+Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt; ([`52151b4`](https://github.com/timhls/t212-cli/commit/52151b4291b03525a0e12dc73faf62884e16abab))
+
+
 ## v0.4.0 (2026-03-18)
 
 ### Chore
