@@ -113,5 +113,14 @@ uv run pytest
 ```bash
 uv run ruff format
 uv run ruff check
-uv run mypy .
+uv run mypy .agents/skills/t212/scripts/t212_cli/
 ```
+
+## Agent Skill
+
+This repository includes an [OpenCode](https://opencode.ai) agent skill at
+`.agents/skills/t212/`. The skill enables AI agents to interact with the
+Trading 212 API — checking portfolios, placing orders, viewing history, and
+generating German tax reports.
+
+See `.agents/skills/t212/SKILL.md` for the full skill definition.

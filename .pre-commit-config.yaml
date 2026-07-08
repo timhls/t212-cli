@@ -35,7 +35,7 @@ repos:
     require_serial: true
   - id: bandit
     name: Bandit
-    entry: uv run bandit -r src
+    entry: uv run bandit -r .agents/skills/t212/scripts
     language: system
     types:
     - python

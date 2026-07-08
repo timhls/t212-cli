@@ -55,12 +55,12 @@ jobs:
       - name: Security Scan with Bandit
         run: |
           # Scan the src folder directly to avoid virtual environments
-          uv run bandit -r src
+          uv run bandit -r .agents/skills/t212/scripts
 
       # 6. Run Pytest and generate coverage report
       - name: Run Pytest with Coverage
         run: |
-          uv run pytest --cov=src --cov-report=xml
+          uv run pytest --cov=.agents/skills/t212/scripts --cov-report=xml
 
       # 7. Post the coverage report to the Pull Request
       - name: Post PR Coverage Comment
