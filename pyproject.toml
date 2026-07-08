@@ -1,6 +1,6 @@
 [project]
 name = "t212-cli"
-version = "1.2.0"
+version = "1.2.1"
 description = "A Python client and CLI for the Trading 212 API"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 t212 = "t212_cli.__main__:app"
+
 
 
 
@@ -51,6 +52,7 @@ version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 build_command = "pip install uv && uv build"
 upload_to_vcs_release = true
+
 
 
 [dependency-groups]

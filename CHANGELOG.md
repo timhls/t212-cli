@@ -2,6 +2,28 @@
 
 
 
+## v1.2.1 (2026-07-08)
+
+### Fix
+
+* fix: critical bug fixes, HTTP robustness, and doc corrections
+
+- Fix tax/config.py: invalid &#39;except A, B:&#39; syntax (Python 2 style, only
+  works by accident in 3.14) → proper tuple except clause with warning
+- Fix client/base.py: add httpx.Client with timeout (30s), connection
+  pooling, and header injection instead of per-call httpx.get/post/delete
+- Fix tax/yahoo_finance.py: add # nosec B501 annotation for verify=False
+- Fix cli/tax.py: handle string cursors (API spec allows string|number),
+  add logging on pagination failures instead of silent break
+- Fix client/base.py: cursor type for get_historical_orders accepts
+  int|str per API spec
+- Update test_client/test_base.py: mock httpx.Client methods instead of
+  module-level httpx functions
+- Update README.md: remove nonexistent config file reference, correct
+  orders feature description
+- Update SKILL.md: clarify limit/stop orders are API-only, not in CLI ([`86e4176`](https://github.com/timhls/t212-cli/commit/86e417647eb550abf8a66dae2eae9ca9ea33561a))
+
+
 ## v1.2.0 (2026-07-08)
 
 ### Feature
