@@ -93,15 +93,16 @@ the agent should consult the `t212` skill (`.agents/skills/t212/SKILL.md`).
 │   ├── main.py          # Main Typer app with sub-apps (account, etf, orders, pies, etc.)
 │   └── tax.py           # German tax reporting commands (separate Typer sub-app)
 ├── client/
-│   └── base.py          # Trading212Client - HTTP wrapper for API calls
+│   └── base.py          # Trading212Client - HTTP wrapper + cached ticker/ISIN resolution
 ├── models/
 │   └── __init__.py      # Pydantic models for API requests/responses
 └── tax/
     ├── calculator.py    # FifoEngine for FIFO tax calculations
     ├── config.py        # Tax configuration loading/saving
-    ├── justetf.py       # justETF scraper (holdings, countries, sectors, TER)
+    ├── justetf.py       # justETF scraper + enrich_profile_with_yahoo()
     ├── market_data.py   # Re-exports get_historical_price from yahoo_finance
     ├── models.py        # Tax-specific Pydantic models (TaxInstrument, EtfProfile, etc.)
+    ├── pie_analysis.py  # Pie deep-dive: aggregated holdings, regions, sectors
     ├── scraper.py       # Finanzfluss web scraping for instrument classification
     └── yahoo_finance.py # yfinance helper with SSL workaround (session, funds data)
 ```
@@ -117,7 +118,7 @@ app.add_typer(orders_app, name="orders")
 
 ### Client Architecture
 
-`Trading212Client` uses Basic Auth with Base64-encoded `api_key_id:secret_key`. Provides `_get()`, `_post()`, `_delete()` helpers. Has `DEMO_URL` and `LIVE_URL` constants.
+`Trading212Client` uses Basic Auth with Base64-encoded `api_key_id:secret_key`. Provides `_get()`, `_post()`, `_delete()` helpers. Has `DEMO_URL` and `LIVE_URL` constants. Includes lazy-cached ticker↔ISIN resolution (`resolve_ticker_from_isin`, `resolve_isin_from_ticker`, `resolve_isins_from_tickers`) backed by a single `get_instruments()` call.
 
 CLI commands: get client → call method → pretty-print → catch errors.
 

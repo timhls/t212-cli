@@ -482,3 +482,94 @@ def test_get_positions(client: Trading212Client) -> None:
         result = client.get_positions(ticker="AAPL")
     assert len(result) == 1
     assert result[0].currentPrice == 110.0
+
+
+def test_resolve_ticker_from_isin(client: Trading212Client) -> None:
+    with patch.object(
+        client.client,
+        "get",
+        return_value=_mock_response(
+            [
+                {
+                    "ticker": "AAPL",
+                    "currencyCode": "USD",
+                    "name": "Apple",
+                    "shortName": "AAPL",
+                    "type": "STOCK",
+                    "workingScheduleId": 1,
+                    "isin": "US0378331005",
+                }
+            ]
+        ),
+    ):
+        result = client.resolve_ticker_from_isin("US0378331005")
+    assert result == "AAPL"
+
+
+def test_resolve_ticker_from_isin_not_found(client: Trading212Client) -> None:
+    with patch.object(
+        client.client,
+        "get",
+        return_value=_mock_response(
+            [
+                {
+                    "ticker": "AAPL",
+                    "currencyCode": "USD",
+                    "name": "Apple",
+                    "shortName": "AAPL",
+                    "type": "STOCK",
+                    "workingScheduleId": 1,
+                    "isin": "US0378331005",
+                }
+            ]
+        ),
+    ):
+        result = client.resolve_ticker_from_isin("UNKNOWN")
+    assert result is None
+
+
+def test_resolve_isin_from_ticker(client: Trading212Client) -> None:
+    with patch.object(
+        client.client,
+        "get",
+        return_value=_mock_response(
+            [
+                {
+                    "ticker": "AAPL",
+                    "currencyCode": "USD",
+                    "name": "Apple",
+                    "shortName": "AAPL",
+                    "type": "STOCK",
+                    "workingScheduleId": 1,
+                    "isin": "US0378331005",
+                }
+            ]
+        ),
+    ):
+        result = client.resolve_isin_from_ticker("AAPL")
+    assert result == "US0378331005"
+
+
+def test_resolve_uses_cache(client: Trading212Client) -> None:
+    """Verify that resolution methods cache instruments (single API call)."""
+    with patch.object(
+        client.client,
+        "get",
+        return_value=_mock_response(
+            [
+                {
+                    "ticker": "AAPL",
+                    "currencyCode": "USD",
+                    "name": "Apple",
+                    "shortName": "AAPL",
+                    "type": "STOCK",
+                    "workingScheduleId": 1,
+                    "isin": "US0378331005",
+                }
+            ]
+        ),
+    ) as mock_get:
+        client.resolve_ticker_from_isin("US0378331005")
+        client.resolve_isin_from_ticker("AAPL")
+        client.resolve_isins_from_tickers()
+    mock_get.assert_called_once()

@@ -5,6 +5,30 @@ from bs4 import BeautifulSoup
 from curl_cffi import requests
 
 from t212_cli.tax.models import EtfHolding, EtfProfile
+from t212_cli.tax.yahoo_finance import get_etf_funds_data
+
+
+def enrich_profile_with_yahoo(profile: EtfProfile, ticker: str) -> EtfProfile:
+    """Enrich an ETF profile with supplementary Yahoo Finance data.
+
+    Fills in gaps that justETF didn't provide: asset classes, holdings,
+    and sector weightings.
+    """
+    yf_data = get_etf_funds_data(ticker)
+    if yf_data:
+        if yf_data.get("asset_classes"):
+            profile.asset_classes = yf_data["asset_classes"]
+        if not profile.holdings and yf_data.get("holdings"):
+            profile.holdings = [
+                EtfHolding(
+                    name=h.get("name", h.get("symbol", "")),
+                    weight=h.get("weight", 0.0),
+                )
+                for h in yf_data["holdings"]
+            ]
+        if not profile.sectors and yf_data.get("sector_weightings"):
+            profile.sectors = yf_data["sector_weightings"]
+    return profile
 
 
 def scrape_justetf(isin: str) -> Optional[EtfProfile]:

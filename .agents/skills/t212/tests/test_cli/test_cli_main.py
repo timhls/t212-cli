@@ -328,3 +328,32 @@ def test_pies_duplicate_error(mock_env: None, mock_client: MagicMock) -> None:
     payload = '{"icon": "Default", "name": "P1"}'
     result = runner.invoke(app, ["pies", "duplicate", "1", payload])
     assert result.exit_code == 0
+
+
+def test_pies_components(mock_env: None, mock_client: MagicMock) -> None:
+    mock_detail = MagicMock()
+    mock_instrument = MagicMock()
+    mock_instrument.model_dump.return_value = {"ticker": "AAPL_US_EQ"}
+    mock_detail.instruments = [mock_instrument]
+    mock_client.get_pie_by_id.return_value = mock_detail
+
+    result = runner.invoke(app, ["pies", "components", "1"])
+    assert result.exit_code == 0
+    assert "AAPL" in result.stdout
+
+
+def test_pies_components_empty(mock_env: None, mock_client: MagicMock) -> None:
+    mock_detail = MagicMock()
+    mock_detail.instruments = []
+    mock_client.get_pie_by_id.return_value = mock_detail
+
+    result = runner.invoke(app, ["pies", "components", "1"])
+    assert result.exit_code == 0
+    assert "no components" in result.stdout
+
+
+def test_pies_components_error(mock_env: None, mock_client: MagicMock) -> None:
+    mock_client.get_pie_by_id.side_effect = Exception("API Error")
+    result = runner.invoke(app, ["pies", "components", "1"])
+    assert result.exit_code == 0
+    assert "Error" in result.stdout

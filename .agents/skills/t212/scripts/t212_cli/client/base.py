@@ -55,6 +55,11 @@ class Trading212Client:
         # Create reusable HTTP client with timeout and connection pooling
         self.client = httpx.Client(timeout=timeout, headers=self.headers)
 
+        # Lazy-loaded instrument caches (populated on first access)
+        self._instruments_cache: Optional[List[TradableInstrument]] = None
+        self._ticker_to_isin: Optional[dict[str, str]] = None
+        self._isin_to_ticker: Optional[dict[str, str]] = None
+
     def _get(
         self, endpoint: str, params: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
@@ -148,6 +153,40 @@ class Trading212Client:
             TradableInstrument(**x)
             for x in self._get("/equity/metadata/instruments").json()
         ]
+
+    def _ensure_instrument_cache(self) -> None:
+        """Fetch and cache instruments for ticker<->ISIN lookups (single API call)."""
+        if self._instruments_cache is not None:
+            return
+        instruments = self.get_instruments()
+        self._instruments_cache = instruments
+        self._ticker_to_isin = {
+            i.ticker: i.isin for i in instruments if i.ticker and i.isin
+        }
+        self._isin_to_ticker = {
+            i.isin: i.ticker for i in instruments if i.ticker and i.isin
+        }
+
+    def resolve_ticker_from_isin(self, isin: str) -> Optional[str]:
+        """Resolve a single ISIN to its T212 ticker using cached instruments."""
+        self._ensure_instrument_cache()
+        if self._isin_to_ticker is None:
+            return None
+        return self._isin_to_ticker.get(isin)
+
+    def resolve_isin_from_ticker(self, ticker: str) -> Optional[str]:
+        """Resolve a single T212 ticker to its ISIN using cached instruments."""
+        self._ensure_instrument_cache()
+        if self._ticker_to_isin is None:
+            return None
+        return self._ticker_to_isin.get(ticker)
+
+    def resolve_isins_from_tickers(self) -> dict[str, str]:
+        """Return full ticker->ISIN mapping (cached, single API call)."""
+        self._ensure_instrument_cache()
+        if self._ticker_to_isin is None:
+            return {}
+        return dict(self._ticker_to_isin)
 
     # 4. Orders
     def get_orders(self) -> List[Order]:

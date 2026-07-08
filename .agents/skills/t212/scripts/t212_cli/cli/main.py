@@ -6,8 +6,8 @@ from rich.console import Console
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import MarketRequest, PieRequest, DuplicateBucketRequest
 from t212_cli.cli.tax import app as tax_app
-from t212_cli.tax.justetf import scrape_justetf
-from t212_cli.tax.yahoo_finance import get_etf_funds_data
+from t212_cli.tax.justetf import scrape_justetf, enrich_profile_with_yahoo
+from t212_cli.tax.pie_analysis import analyze_pie
 
 app = typer.Typer(help="Trading 212 CLI")
 console = Console()
@@ -207,6 +207,46 @@ def pies_get(pie_id: int) -> None:
         console.print(f"[red]Error: {e}[/red]")
 
 
+@pies_app.command("components")
+def pies_components(pie_id: int) -> None:
+    """List the instruments (components) of a pie by ID."""
+    client = get_client()
+    try:
+        detail = client.get_pie_by_id(pie_id)
+        instruments = detail.instruments or []
+        if not instruments:
+            console.print(f"[yellow]Pie {pie_id} has no components.[/yellow]")
+            return
+        pretty_print(instruments)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("analyze")
+def pies_analyze(
+    pie_id: int,
+    top: int = typer.Option(30, "--top", help="Number of top holdings to show"),
+    no_yahoo: bool = typer.Option(
+        False, "--no-yahoo", help="Skip Yahoo Finance enrichment"
+    ),
+) -> None:
+    """Deep-dive analysis of a pie: aggregated holdings, regions, and sectors.
+
+    Fetches underlying ETF holdings via justETF, weights each by the
+    component's current pie share, and aggregates across all ETFs.
+    Outputs JSON with top holdings, geographic breakdown, and sector breakdown.
+    """
+    client = get_client()
+    try:
+        result = analyze_pie(client, pie_id, enrich_with_yahoo=not no_yahoo)
+        data = result.to_dict()
+        if top > 0:
+            data["top_holdings"] = data["top_holdings"][:top]
+        console.print_json(json.dumps(data, default=str))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
 @pies_app.command("delete")
 def pies_delete(pie_id: int) -> None:
     """Delete a pie by ID."""
@@ -323,9 +363,7 @@ def pies_duplicate(
 def _resolve_ticker_from_isin(isin: str) -> str | None:
     client = get_client()
     try:
-        for instr in client.get_instruments():
-            if instr.isin == isin:
-                return instr.ticker
+        return client.resolve_ticker_from_isin(isin)
     except Exception:  # noqa: B110  # nosec B110
         pass
     return None
@@ -335,23 +373,7 @@ def _enrich_with_yahoo(profile: Any, isin: str) -> Any:
     ticker = _resolve_ticker_from_isin(isin)
     if not ticker:
         return profile
-    yf_data = get_etf_funds_data(ticker)
-    if yf_data:
-        if yf_data.get("asset_classes"):
-            profile.asset_classes = yf_data["asset_classes"]
-        if not profile.holdings and yf_data.get("holdings"):
-            from t212_cli.tax.models import EtfHolding
-
-            profile.holdings = [
-                EtfHolding(
-                    name=h.get("name", h.get("symbol", "")),
-                    weight=h.get("weight", 0.0),
-                )
-                for h in yf_data["holdings"]
-            ]
-        if not profile.sectors and yf_data.get("sector_weightings"):
-            profile.sectors = yf_data["sector_weightings"]
-    return profile
+    return enrich_profile_with_yahoo(profile, ticker)
 
 
 # === ETF ===
@@ -384,18 +406,11 @@ def etf_holdings(isin: str) -> None:
             if not ticker:
                 console.print(f"[red]No holdings found for ISIN {isin}.[/red]")
                 return
-            yf_data = get_etf_funds_data(ticker)
-            if yf_data and yf_data.get("holdings"):
-                from t212_cli.tax.models import EtfHolding
+            from t212_cli.tax.models import EtfProfile
 
-                holdings = [
-                    EtfHolding(
-                        name=h.get("name", h.get("symbol", "")),
-                        weight=h.get("weight", 0.0),
-                    )
-                    for h in yf_data["holdings"]
-                ]
-                pretty_print(holdings)
+            profile = enrich_profile_with_yahoo(EtfProfile(isin=isin), ticker)
+            if profile.holdings:
+                pretty_print(profile.holdings)
                 return
             console.print(f"[red]No holdings found for ISIN {isin}.[/red]")
             return
@@ -429,18 +444,14 @@ def etf_sectors(isin: str) -> None:
             if not ticker:
                 console.print(f"[red]No sector data found for ISIN {isin}.[/red]")
                 return
-            yf_data = get_etf_funds_data(ticker)
-            if yf_data and yf_data.get("sector_weightings"):
-                import json
+            from t212_cli.tax.models import EtfProfile
 
-                console.print_json(
-                    json.dumps(yf_data["sector_weightings"], default=str)
-                )
+            profile = enrich_profile_with_yahoo(EtfProfile(isin=isin), ticker)
+            if profile.sectors:
+                console.print_json(json.dumps(profile.sectors, default=str))
                 return
             console.print(f"[red]No sector data found for ISIN {isin}.[/red]")
             return
-        import json
-
         console.print_json(json.dumps(profile.sectors, default=str))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

@@ -20,7 +20,8 @@ metadata:
 - **Orders**: "Place a market buy for 10 shares of AAPL", "Cancel order 12345" (Limit and stop orders are supported by the API but not exposed in the CLI)
 - **History**: "Show my transactions", "What dividends did I receive?"
 - **Tax reporting**: "Generate German tax report for 2024"
-- **Pies**: "List my pies", "Create a new pie"
+- **Pies**: "List my pies", "Create a new pie", "Analyze pie holdings"
+- **ETF analysis**: "Analyze ISIN with justETF and Yahoo Finance", "Get ETF holdings"
 
 ## How to invoke
 
@@ -94,6 +95,19 @@ uv run t212 pies list
 
 # Get pie by ID
 uv run t212 pies get 12345
+
+# List pie components (instruments) with ISINs
+uv run t212 pies components 12345
+
+# Deep-dive analysis: aggregate all underlying ETF holdings,
+# weighted by pie share, grouped by company/region/sector
+uv run t212 pies analyze 12345
+
+# Analyze with custom top-N holdings limit
+uv run t212 pies analyze 12345 --top 50
+
+# Analyze without Yahoo Finance enrichment (justETF only)
+uv run t212 pies analyze 12345 --no-yahoo
 
 # Create a pie from JSON
 uv run t212 pies create '{"name":"Tech","instrumentShares":{"AAPL_US_EQ":0.5,"MSFT_US_EQ":0.5}}'
@@ -189,6 +203,17 @@ handles this automatically.
    `nextPagePath`. The CLI handles this automatically in tax reporting.
 7. **No idempotency**: The beta API does not guarantee idempotent order
    placement — duplicate requests may create duplicate orders.
+8. **Instrument resolution cache**: `resolve_ticker_from_isin()` and
+   `resolve_isin_from_ticker()` cache the instruments list after the first
+   call (single API request). This avoids rate limits during pie analysis
+   and ETF enrichment workflows.
+9. **Commodity ETCs have no justETF data**: Synthetic commodity ETCs (e.g.,
+   WisdomTree Energy/Agriculture) are not covered by justETF. Use
+   `--no-yahoo` to skip the Yahoo Finance fallback if it's not useful.
+10. **Pie analyze output**: `pies analyze` returns JSON with `top_holdings`
+    (ranked by effective pie weight), `countries`, `sectors`,
+    `etf_profiles`, and `components_without_data`. Only top-10 holdings per
+    ETF are visible via justETF; the rest is in the undisclosed tail.
 
 ## Tax Module (German Tax Reporting)
 
@@ -218,6 +243,29 @@ The CLI fetches ETF data from two sources:
 `fc.yahoo.com`. The `tax/yahoo_finance.py` module creates a session with
 `verify=False` and `impersonate="chrome"` to work around this. The session is
 passed to `yf.Ticker(symbol, session=session)`.
+
+**Enrichment**: `tax/justetf.py` provides `enrich_profile_with_yahoo()` to fill
+gaps in justETF profiles with Yahoo Finance data (asset classes, holdings,
+sectors). This is used by both `etf profile` and `pies analyze`.
+
+## Pie Analysis
+
+The `tax/pie_analysis.py` module provides deep-dive analysis of investment pies:
+
+- **`analyze_pie()`**: Fetches underlying ETF holdings via justETF, weights each
+  by the component's current pie share, and aggregates across all ETFs. Returns
+  a `PieAnalysisResult` with ranked holdings, geographic breakdown, and sector
+  breakdown. Handles duplicate companies across ETFs and tracks components
+  without data (e.g., commodity ETCs).
+- **`enrich_pie_components()`**: Fetches pie detail and resolves each component
+  ticker to its ISIN using the client's cached instrument map.
+
+Output includes:
+- `top_holdings`: Individual companies ranked by effective pie weight
+- `countries`: Pie-weighted geographic exposure
+- `sectors`: Pie-weighted sector/industry breakdown
+- `etf_profiles`: Per-ETF metadata (name, ISIN, share)
+- `components_without_data`: Tickers where no ETF profile was found
 
 ## Further reading
 
