@@ -90,7 +90,7 @@ the agent should consult the `t212` skill (`.agents/skills/t212/SKILL.md`).
 .agents/skills/t212/scripts/t212_cli/
 ├── __main__.py          # Entry point, imports app from cli/main.py
 ├── cli/
-│   ├── main.py          # Main Typer app with sub-apps (account, orders, pies, etc.)
+│   ├── main.py          # Main Typer app with sub-apps (account, etf, orders, pies, etc.)
 │   └── tax.py           # German tax reporting commands (separate Typer sub-app)
 ├── client/
 │   └── base.py          # Trading212Client - HTTP wrapper for API calls
@@ -99,9 +99,11 @@ the agent should consult the `t212` skill (`.agents/skills/t212/SKILL.md`).
 └── tax/
     ├── calculator.py    # FifoEngine for FIFO tax calculations
     ├── config.py        # Tax configuration loading/saving
-    ├── market_data.py   # Market data fetching (yfinance)
-    ├── models.py        # Tax-specific Pydantic models
-    └── scraper.py       # Web scraping for instrument classification
+    ├── justetf.py       # justETF scraper (holdings, countries, sectors, TER)
+    ├── market_data.py   # Re-exports get_historical_price from yahoo_finance
+    ├── models.py        # Tax-specific Pydantic models (TaxInstrument, EtfProfile, etc.)
+    ├── scraper.py       # Finanzfluss web scraping for instrument classification
+    └── yahoo_finance.py # yfinance helper with SSL workaround (session, funds data)
 ```
 
 ### CLI Structure with Typer Sub-apps

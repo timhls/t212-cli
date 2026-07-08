@@ -121,6 +121,22 @@ uv run t212 tax config
 uv run t212 tax fifo-report --year 2024
 ```
 
+### ETF Profile
+
+```bash
+# Full ETF profile (holdings, regions, sectors, TER, etc.)
+uv run t212 etf profile IE00BJ0KDQ92
+
+# Just top holdings
+uv run t212 etf holdings IE00BJ0KDQ92
+
+# Just geographic regions
+uv run t212 etf regions IE00BJ0KDQ92
+
+# Just sector breakdown
+uv run t212 etf sectors IE00BJ0KDQ92
+```
+
 ## Configuration
 
 Environment variables:
@@ -184,6 +200,24 @@ The CLI includes German tax reporting via FIFO cost basis calculation:
 - **Config**: Stores instrument classifications locally at `~/.t212/tax_config.yml`
 - **Vorabpauschale**: Preliminary lump-sum calculation for German investment
   funds (separate script)
+
+## ETF Data
+
+The CLI fetches ETF data from two sources:
+
+- **justETF** (`justetf.com`): Scraped via `curl_cffi` with Chrome impersonation.
+  Provides top 10 holdings (with ISINs), country/region breakdown, sector
+  weights, TER, fund size, distribution policy, replication type, and fund
+  currency. ISIN-addressable (e.g., `?isin=IE00BJ0KDQ92`).
+- **Yahoo Finance** (via `yfinance`): Supplementary data including asset
+  allocation (cash/stock/bond), fund operations (expense ratio, turnover, net
+  assets), and equity holdings valuations. Uses `curl_cffi.Session(verify=False,
+  impersonate="chrome")` as SSL workaround.
+
+**yfinance fix**: The `curl_cffi` library (0.13.0+) has an SSL issue with
+`fc.yahoo.com`. The `tax/yahoo_finance.py` module creates a session with
+`verify=False` and `impersonate="chrome"` to work around this. The session is
+passed to `yf.Ticker(symbol, session=session)`.
 
 ## Further reading
 

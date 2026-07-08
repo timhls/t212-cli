@@ -6,12 +6,15 @@ from rich.console import Console
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import MarketRequest, PieRequest, DuplicateBucketRequest
 from t212_cli.cli.tax import app as tax_app
+from t212_cli.tax.justetf import scrape_justetf
+from t212_cli.tax.yahoo_finance import get_etf_funds_data
 
 app = typer.Typer(help="Trading 212 CLI")
 console = Console()
 
 
 account_app = typer.Typer(help="Account summary and commands")
+etf_app = typer.Typer(help="ETF profile, holdings, regions, and sectors")
 history_app = typer.Typer(
     help="Historical events (dividends, exports, orders, transactions)"
 )
@@ -21,6 +24,7 @@ pies_app = typer.Typer(help="Manage investment pies")
 positions_app = typer.Typer(help="Manage open positions")
 
 app.add_typer(account_app, name="account")
+app.add_typer(etf_app, name="etf")
 app.add_typer(history_app, name="history")
 app.add_typer(metadata_app, name="metadata")
 app.add_typer(orders_app, name="orders")
@@ -312,5 +316,131 @@ def pies_duplicate(
 
         req = DuplicateBucketRequest(**data)
         pretty_print(client.duplicate_pie(pie_id, req))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+def _resolve_ticker_from_isin(isin: str) -> str | None:
+    client = get_client()
+    try:
+        for instr in client.get_instruments():
+            if instr.isin == isin:
+                return instr.ticker
+    except Exception:  # noqa: B110  # nosec B110
+        pass
+    return None
+
+
+def _enrich_with_yahoo(profile: Any, isin: str) -> Any:
+    ticker = _resolve_ticker_from_isin(isin)
+    if not ticker:
+        return profile
+    yf_data = get_etf_funds_data(ticker)
+    if yf_data:
+        if yf_data.get("asset_classes"):
+            profile.asset_classes = yf_data["asset_classes"]
+        if not profile.holdings and yf_data.get("holdings"):
+            from t212_cli.tax.models import EtfHolding
+
+            profile.holdings = [
+                EtfHolding(
+                    name=h.get("name", h.get("symbol", "")),
+                    weight=h.get("weight", 0.0),
+                )
+                for h in yf_data["holdings"]
+            ]
+        if not profile.sectors and yf_data.get("sector_weightings"):
+            profile.sectors = yf_data["sector_weightings"]
+    return profile
+
+
+# === ETF ===
+@etf_app.command("profile")
+def etf_profile(isin: str) -> None:
+    """Get full ETF profile (holdings, regions, sectors, TER, etc.)."""
+    try:
+        profile = scrape_justetf(isin)
+        if not profile:
+            console.print(f"[red]Could not fetch ETF profile for ISIN {isin}.[/red]")
+            return
+        profile = _enrich_with_yahoo(profile, isin)
+        if not profile.asset_classes and not profile.holdings and not profile.countries:
+            console.print(
+                f"[yellow]No detailed data found for ISIN {isin}. "
+                "This may not be a UCITS ETF or justETF may not cover it.[/yellow]"
+            )
+        pretty_print(profile)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@etf_app.command("holdings")
+def etf_holdings(isin: str) -> None:
+    """Get ETF top holdings."""
+    try:
+        profile = scrape_justetf(isin)
+        if not profile or not profile.holdings:
+            ticker = _resolve_ticker_from_isin(isin)
+            if not ticker:
+                console.print(f"[red]No holdings found for ISIN {isin}.[/red]")
+                return
+            yf_data = get_etf_funds_data(ticker)
+            if yf_data and yf_data.get("holdings"):
+                from t212_cli.tax.models import EtfHolding
+
+                holdings = [
+                    EtfHolding(
+                        name=h.get("name", h.get("symbol", "")),
+                        weight=h.get("weight", 0.0),
+                    )
+                    for h in yf_data["holdings"]
+                ]
+                pretty_print(holdings)
+                return
+            console.print(f"[red]No holdings found for ISIN {isin}.[/red]")
+            return
+        pretty_print(profile.holdings)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@etf_app.command("regions")
+def etf_regions(isin: str) -> None:
+    """Get ETF geographic region breakdown."""
+    try:
+        profile = scrape_justetf(isin)
+        if not profile or not profile.countries:
+            console.print(f"[red]No country/region data found for ISIN {isin}.[/red]")
+            return
+        import json
+
+        console.print_json(json.dumps(profile.countries, default=str))
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@etf_app.command("sectors")
+def etf_sectors(isin: str) -> None:
+    """Get ETF sector breakdown."""
+    try:
+        profile = scrape_justetf(isin)
+        if not profile or not profile.sectors:
+            ticker = _resolve_ticker_from_isin(isin)
+            if not ticker:
+                console.print(f"[red]No sector data found for ISIN {isin}.[/red]")
+                return
+            yf_data = get_etf_funds_data(ticker)
+            if yf_data and yf_data.get("sector_weightings"):
+                import json
+
+                console.print_json(
+                    json.dumps(yf_data["sector_weightings"], default=str)
+                )
+                return
+            console.print(f"[red]No sector data found for ISIN {isin}.[/red]")
+            return
+        import json
+
+        console.print_json(json.dumps(profile.sectors, default=str))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
