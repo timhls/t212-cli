@@ -2,6 +2,17 @@
 
 
 
+## v1.2.2 (2026-07-08)
+
+### Fix
+
+* fix: replace assert with None checks for bandit compliance
+
+Replace assert statements in resolve_ticker_from_isin, resolve_isin_from_ticker,
+and resolve_isins_from_tickers with explicit None checks to satisfy bandit
+B101 and ensure correct behavior under optimized bytecode. ([`6fe21d4`](https://github.com/timhls/t212-cli/commit/6fe21d4d682939ddda869ce412cc8a569deddce8))
+
+
 ## v1.2.1 (2026-07-08)
 
 ### Fix
