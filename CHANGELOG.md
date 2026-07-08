@@ -2,6 +2,23 @@
 
 
 
+## v1.2.0 (2026-07-08)
+
+### Feature
+
+* feat: add justetf scraper and yfinance SSL workaround for ETF data
+
+- Add tax/justetf.py: scrape justETF for holdings, countries, sectors, TER
+- Add tax/yahoo_finance.py: curl_cffi session with verify=False to fix
+  fc.yahoo.com SSL issue, enables yfinance for ETF funds data
+- Fix tax/market_data.py: delegate to yahoo_finance instead of direct
+  yfinance import
+- Add EtfProfile/EtfHolding models to tax/models.py
+- Add &#39;etf&#39; CLI sub-app: profile, holdings, regions, sectors commands
+- Add tests for justetf, yahoo_finance, etf CLI, updated market_data tests
+- Update SKILL.md and AGENTS.md with ETF commands and architecture ([`8e9e7d4`](https://github.com/timhls/t212-cli/commit/8e9e7d47f0ffebef28a11f23a6b3f56970b33f94))
+
+
 ## v1.1.0 (2026-07-08)
 
 ### Chore
