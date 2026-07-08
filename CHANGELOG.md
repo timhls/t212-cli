@@ -2,6 +2,24 @@
 
 
 
+## v1.1.0 (2026-07-08)
+
+### Chore
+
+* chore: add .idea/ to gitignore ([`df27bdc`](https://github.com/timhls/t212-cli/commit/df27bdc69ae04680cc50092f14dd01a65c5fd628))
+
+### Feature
+
+* feat: add t212 agent skill, restructure into .agents/skills/t212/
+
+- Move source code from src/t212_cli/ -&gt; .agents/skills/t212/scripts/t212_cli/
+- Move tests from tests/ -&gt; .agents/skills/t212/tests/
+- Create SKILL.md with full skill definition (CLI commands, config, gotchas)
+- Add reference docs (api.md, api.yaml, API terms)
+- Update pyproject.toml with hatch build config and pytest test paths
+- Update CI/CD paths, pre-commit hook paths, AGENTS.md, README.md ([`5a685ee`](https://github.com/timhls/t212-cli/commit/5a685eefaf0d48acae8bfcf375376576bc276944))
+
+
 ## v1.0.0 (2026-03-26)
 
 ### Breaking
