@@ -1,6 +1,7 @@
 import yaml
 from pathlib import Path
 from pydantic import ValidationError
+from rich.console import Console
 from t212_cli.tax.models import TaxConfig, TaxInstrument
 
 CONFIG_DIR = Path.home() / ".t212"
@@ -15,8 +16,11 @@ def load_tax_config() -> TaxConfig:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return TaxConfig(**data)
-    except ValidationError, yaml.YAMLError:
-        # Fallback if corrupt
+    except (ValidationError, yaml.YAMLError) as e:
+        console = Console()
+        console.print(
+            f"[yellow]Warning: tax config corrupted, using defaults: {e}[/yellow]"
+        )
         return TaxConfig()
 
 

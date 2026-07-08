@@ -6,6 +6,8 @@ from curl_cffi import requests as cffi_requests
 
 
 def _get_session() -> cffi_requests.Session:
+    # nosec B501: SSL verification disabled as workaround for fc.yahoo.com SSL issues
+    # See SKILL.md for full explanation of this workaround
     return cffi_requests.Session(verify=False, impersonate="chrome")
 
 

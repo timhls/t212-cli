@@ -83,7 +83,7 @@ def generate_fifo_report(year: int = 2024) -> None:
 
     # Fetch all historical orders using pagination
     all_orders: list[HistoricalOrder] = []
-    cursor = None
+    cursor: int | str | None = None
     with console.status("[dim]Fetching orders...[/dim]"):
         while True:
             res = client.get_historical_orders(limit=50, cursor=cursor)
@@ -103,8 +103,19 @@ def generate_fifo_report(year: int = 2024) -> None:
                 cursor_str = query_params.get("cursor", [None])[0]
                 if not cursor_str:
                     break
-                cursor = int(cursor_str)
+                # Handle both string and numeric cursors per API spec (cursor: string | number)
+                try:
+                    cursor = int(cursor_str)
+                except ValueError:
+                    # If not numeric, pass the raw string cursor
+                    cursor = cursor_str
             except Exception:
+                # Log the error for visibility instead of silent break
+                import logging
+
+                logging.warning(
+                    f"Pagination failed at cursor, stopping: {res.nextPagePath}"
+                )
                 break
 
     console.print(f"[green]Loaded {len(all_orders)} historical orders.[/green]")

@@ -30,12 +30,17 @@ class Trading212Client:
     LIVE_URL = "https://live.trading212.com/api/v0"
 
     def __init__(
-        self, api_key_id: str, secret_key: str, base_url: Optional[str] = None
+        self,
+        api_key_id: str,
+        secret_key: str,
+        base_url: Optional[str] = None,
+        timeout: Optional[float] = 30.0,
     ):
         self.api_key_id = api_key_id
         self.secret_key = secret_key
         # Use provided base_url, or T212_BASE_URL env var, or default to DEMO_URL
         self.base_url = base_url or os.environ.get("T212_BASE_URL", self.DEMO_URL)
+        self.timeout = timeout
 
         credentials_string = f"{api_key_id}:{secret_key}"
         encoded_credentials = base64.b64encode(
@@ -47,11 +52,14 @@ class Trading212Client:
             "Accept": "application/json",
         }
 
+        # Create reusable HTTP client with timeout and connection pooling
+        self.client = httpx.Client(timeout=timeout, headers=self.headers)
+
     def _get(
         self, endpoint: str, params: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
-        response = httpx.get(url, headers=self.headers, params=params)
+        response = self.client.get(url, params=params)
         response.raise_for_status()
         return response
 
@@ -59,13 +67,13 @@ class Trading212Client:
         self, endpoint: str, json_data: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
-        response = httpx.post(url, headers=self.headers, json=json_data)
+        response = self.client.post(url, json=json_data)
         response.raise_for_status()
         return response
 
     def _delete(self, endpoint: str) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
-        response = httpx.delete(url, headers=self.headers)
+        response = self.client.delete(url)
         response.raise_for_status()
         return response
 
@@ -107,7 +115,7 @@ class Trading212Client:
     def get_historical_orders(
         self,
         limit: int = 20,
-        cursor: Optional[int] = None,
+        cursor: Optional[int | str] = None,
         ticker: Optional[str] = None,
     ) -> PaginatedResponseHistoricalOrder:
         params: dict[str, Any] = {"limit": limit}

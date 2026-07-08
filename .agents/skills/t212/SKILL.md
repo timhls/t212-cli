@@ -17,7 +17,7 @@ metadata:
 
 - **Portfolio check**: "What's my account balance?", "Show my portfolio"
 - **Positions**: "List my open positions", "What am I holding?"
-- **Orders**: "Place a market buy for 10 shares of AAPL", "Cancel order 12345"
+- **Orders**: "Place a market buy for 10 shares of AAPL", "Cancel order 12345" (Limit and stop orders are supported by the API but not exposed in the CLI)
 - **History**: "Show my transactions", "What dividends did I receive?"
 - **Tax reporting**: "Generate German tax report for 2024"
 - **Pies**: "List my pies", "Create a new pie"

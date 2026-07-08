@@ -7,7 +7,7 @@ A Python client and CLI for the Trading 212 API.
 - **Account Management**: View account summary, cash balances, and general settings.
 - **Instruments**: List available instruments (stocks, ETFs) and exchanges.
 - **Positions**: View open positions in your account.
-- **Orders**: Place, modify, list, and cancel market, limit, and stop orders.
+- **Orders**: List, get, cancel, and place market orders. Limit and stop orders are supported by the API but not exposed in the CLI.
 - **Pies**: Create, update, duplicate, and delete investment pies from JSON payloads.
 - **History**: View historical events like dividends, exports, orders, and transactions.
 
@@ -36,7 +36,7 @@ The CLI requires a Trading 212 API key ID and secret key. You can provide these 
    export T212_SECRET_KEY="your-secret-key"
    ```
 
-2. **Configuration File**: A configuration file located at `~/.config/t212-cli/config.json` (or `%APPDATA%\t212-cli\config.json` on Windows).
+2. **Environment Variables**: The CLI reads API credentials from environment variables `T212_API_KEY_ID` and `T212_SECRET_KEY`. Optionally, `T212_BASE_URL` can specify the API endpoint (defaults to demo).
 
 ### API Environment Selection
 
