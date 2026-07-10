@@ -10,7 +10,7 @@ compatibility: Requires Python 3.14+, uv, and Trading 212 API credentials
   (T212_API_KEY_ID, T212_SECRET_KEY).
 metadata:
   author: timoh
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ## When to use
@@ -22,6 +22,8 @@ metadata:
 - **Tax reporting**: "Generate German tax report for 2024"
 - **Pies**: "List my pies", "Create a new pie", "Analyze pie holdings"
 - **ETF analysis**: "Analyze ISIN with justETF and Yahoo Finance", "Get ETF holdings"
+- **212 Card transactions**: "Show my card spending", "What did I spend on the card?"
+  (Note: the API only exposes anonymous ledger entries — see API Limitations below)
 
 ## How to invoke
 
@@ -172,6 +174,46 @@ The API uses HTTP Basic Auth. Credentials are Base64-encoded as
 `api_key_id:secret_key` and sent in the `Authorization` header. The client
 handles this automatically.
 
+## API Limitations
+
+The Trading 212 Public API is in **beta** and only covers **Invest** and
+**Stocks ISA** account types. Key limitations the agent must be aware of:
+
+### No Card Transaction Details
+
+Trading 212 offers a **212 Card** (debit card issued by Paynetics UK Ltd.)
+that spends directly from the investment account cash balance. Card
+transactions **do appear** in the transaction history endpoint, but the API
+provides **no merchant names, categories, locations, or card metadata**.
+
+The `GET /equity/history/transactions` endpoint returns only:
+
+| Field | Description |
+|-------|-------------|
+| `type` | `WITHDRAW`, `DEPOSIT`, `FEE`, `TRANSFER` |
+| `amount` | Signed amount in transaction currency |
+| `currency` | Currency code (e.g., `EUR`) |
+| `reference` | Internal UUID (not a merchant name) |
+| `dateTime` | Settlement timestamp (not real-world purchase time) |
+
+The API description itself says **"Fetch superficial information"**.
+
+**If a user asks about card spending details** (e.g., "find my Alibaba
+purchases"), the agent should:
+1. Explain that the API does not expose merchant-level data
+2. Direct the user to the **T212 app → Cards tab** where merchant names,
+   locations, cashback, and fees are visible
+3. Mention that CSV/PDF statement exports from the app may contain more detail
+
+### Other API Gaps
+
+- **No multi-currency support**: All values in primary account currency only
+- **No CFD account support**: API is Invest/ISA only
+- **No card management endpoints**: No API to freeze/unfreeze cards, set PIN,
+  view card number, or manage spending pots
+- **No real-time price streaming**: Use the position/summary endpoints for
+  current values
+
 ## API Rate Limits
 
 | Endpoint | Rate Limit |
@@ -214,6 +256,16 @@ handles this automatically.
     (ranked by effective pie weight), `countries`, `sectors`,
     `etf_profiles`, and `components_without_data`. Only top-10 holdings per
     ETF are visible via justETF; the rest is in the undisclosed tail.
+11. **Card transactions have no merchant data**: The 212 Card exists as a
+    product, but the API exposes card spends only as anonymous `WITHDRAW`
+    entries with a UUID reference. No merchant name, category, or location
+    is available via the API. Direct users to the T212 app for card
+    transaction details.
+12. **Transactions endpoint returns superficial data**: The API literally
+    describes the endpoint as "superficial information". If a user needs
+    detailed transaction data, suggest CSV exports via the app or
+    `POST /equity/history/exports` (though exports are also limited to the
+    same fields).
 
 ## Tax Module (German Tax Reporting)
 

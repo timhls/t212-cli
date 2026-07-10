@@ -561,7 +561,15 @@ Rate limit: 1 req / 30s
 
 ### Get transactions
 
- - [GET /api/v0/equity/history/transactions](https://docs.trading212.com/api/historical-events/transactions.md): Fetch superficial information about movements to and from your account
+ - [GET /api/v0/equity/history/transactions](https://docs.trading212.com/api/historical-events/transactions.md): Fetch **superficial** information about movements to and from your account.
+
+**Important**: This endpoint returns only `type` (WITHDRAW/DEPOSIT/FEE/TRANSFER),
+`amount`, `currency`, `reference` (UUID), and `dateTime`. No merchant names,
+card metadata, categories, or descriptions are available — even for 212 Card
+transactions. The Trading 212 Card (issued by Paynetics UK Ltd.) spends from
+the investment account balance, so card transactions appear here as anonymous
+`WITHDRAW` entries. For merchant-level card transaction details, use the
+T212 app (Cards tab).
 
 Rate limit: 6 req / 1m0s
 
