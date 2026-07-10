@@ -2,6 +2,23 @@
 
 
 
+## v1.2.3 (2026-07-10)
+
+### Fix
+
+* fix: correct Vorabpauschale formula and loss offsetting per German tax law
+
+- §18 Abs.1 InvStG: include dividends in Wertsteigerung, apply max(0,...)
+- §18 Abs.2 InvStG: prorate Basisertrag before min() comparison (not after)
+- §19 Abs.1 Satz 4 InvStG: deduct accumulated Vorabpauschale without TFS at sale
+- §20 Abs.6 Satz 4 EStG: Aktiengewinne only offset Aktienverlusttopf (not sonstige)
+- §23 Abs.3 Satz 5 EStG: add Freigrenze €1,000 all-or-nothing for §23 gains
+- §32d Abs.1 Satz 3 EStG: reduced Abgeltungsteuer rate when church tax applies
+- Add tax reference document (german-capital-investment-taxation.md)
+- Add 19 validation tests against reference document examples
+- Update SKILL.md with legal basis table and basiszins values ([`fcade83`](https://github.com/timhls/t212-cli/commit/fcade83c0b7d099848eb541acf5f290610c3213b))
+
+
 ## v1.2.2 (2026-07-08)
 
 ### Fix
