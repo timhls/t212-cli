@@ -186,13 +186,13 @@ class FifoEngine:
             if self.target_year and event.date.year == self.target_year:
                 self.year_aktien_verlust_generated += abs(aktien_taxable_amount)
         elif aktien_taxable_amount > 0:
+            # §20 Abs.6 Satz 4 EStG: Aktiengewinne only offset Aktienverlusttopf.
+            # Cross-bucket offsetting with sonstige Verlusttopf is legally
+            # prohibited (BFH considers this unconstitutional under 2 BvL 3/21,
+            # assessments are provisional since 2022 — we follow the statute).
             offset = min(aktien_taxable_amount, self.aktien_verlusttopf)
             self.aktien_verlusttopf -= offset
             aktien_taxable_amount -= offset
-            if aktien_taxable_amount > 0:
-                offset2 = min(aktien_taxable_amount, self.sonstige_verlusttopf)
-                self.sonstige_verlusttopf -= offset2
-                aktien_taxable_amount -= offset2
             self.taxable_gains += aktien_taxable_amount
             if self.target_year and event.date.year == self.target_year:
                 self.year_taxable_gains += aktien_taxable_amount
@@ -262,6 +262,9 @@ class FifoEngine:
                 continue
 
             dividends_paid = dividends_paid_by_isin.get(isin, 0.0)
+            # Full-year Wertsteigerung includes dividends (§18 Abs.1 InvStG)
+            # Uses start-of-year market price, not tranche-specific price
+            full_wertsteigerung = end_price_year - start_price_year + dividends_paid
 
             for tranche in tranches:
                 # Determine start price
@@ -275,63 +278,81 @@ class FifoEngine:
                     # Bought after this year, skip
                     continue
 
-                # Base return
-                basisertrag = start_price * basiszins * 0.7
+                # §18 Abs.1 Satz 2 InvStG: Basisertrag with 70% cost absorption
+                # §18 Abs.2 InvStG: 1/12 reduction for mid-year purchases
+                # applied to Basisertrag BEFORE min() comparison
+                basisertrag = (
+                    start_price
+                    * basiszins
+                    * 0.7
+                    * (12 - months_prior_to_purchase)
+                    / 12.0
+                )
 
-                # Actual value increase
-                wertsteigerung = end_price_year - start_price
-                # We could add dividends to wertsteigerung but the prompt says
-                # "Take the lower of base return and actual value increase. Subtract dividends."
-
-                # Apply min
-                vorabpauschale = min(basisertrag, wertsteigerung)
+                # §18 Abs.1 InvStG: Vorabpauschale = max(0, min(Basisertrag, Wertsteigerung) - Dividends)
+                # Wertsteigerung is NOT prorated for mid-year purchases
+                vorabpauschale = max(
+                    0.0, min(basisertrag, full_wertsteigerung) - dividends_paid
+                )
 
                 if vorabpauschale <= 0:
                     continue
 
-                # Subtract dividends paid during the year per unit
-                # Assume dividends_paid is total per share
-                vorabpauschale -= dividends_paid
-
-                if vorabpauschale <= 0:
-                    continue
-
-                # Apply 1/12 rule
-                vorabpauschale *= (12 - months_prior_to_purchase) / 12.0
-
-                # Apply TFS quote
-                vorabpauschale *= 1.0 - tfs_quote
-
-                # Accumulate per tranche
+                # Store FULL (pre-TFS) amount per §19 Abs.1 Satz 4 InvStG:
+                # accumulated Vorabpauschale is deducted from sale gain
+                # "ohne Berücksichtigung der Teilfreistellungen"
                 tranche.accumulated_vorabpauschale += vorabpauschale * tranche.quantity
+
+                # §18 Abs.3 InvStG: Vorabpauschale is taxable on first business
+                # day of the following year. Apply TFS to the taxable portion.
+                taxable_vorab = vorabpauschale * (1.0 - tfs_quote) * tranche.quantity
+                self.taxable_gains += taxable_vorab
+                if self.target_year and year == self.target_year:
+                    self.year_taxable_gains += taxable_vorab
 
     def calculate_final_tax(
         self,
         kirchensteuer_rate: float = 0.0,
         sparer_pauschbetrag_available: float = 1000.0,
+        personal_tax_rate: float = 0.0,
     ) -> float:
+        """Calculate total tax liability.
+
+        For §20 EStG gains: Abgeltungsteuer with Sparer-Pauschbetrag.
+        For §23 EStG gains (physical ETC, crypto < 1yr): personal tax rate
+        with €1,000 Freigrenze (all-or-nothing threshold).
+        """
+        # §20 EStG: Abgeltungsteuer path
         taxable = self.taxable_gains
 
-        # Subtract Sparer-Pauschbetrag
+        # Subtract Sparer-Pauschbetrag (§20 Abs.9 EStG)
         taxable -= sparer_pauschbetrag_available
-        if taxable <= 0:
-            return 0.0
+        if taxable < 0:
+            taxable = 0.0
 
-        # Effective tax rate algorithm
+        # §32d Abs.1 Satz 3 EStG: reduced rate when church tax applies
         effective_rate = 0.25 / (1 + 0.25 * kirchensteuer_rate)
 
-        # Kapitalertragsteuer
         kapitalertragsteuer = taxable * effective_rate
 
-        # Solidaritätszuschlag (5.5% of Kapitalertragsteuer)
+        # Solidaritätszuschlag: 5.5% of Kapitalertragsteuer
         soli = kapitalertragsteuer * 0.055
 
-        # Kirchensteuer (if applicable)
+        # Kirchensteuer: kist_rate of Kapitalertragsteuer
         kirchensteuer = kapitalertragsteuer * kirchensteuer_rate
 
         final_tax = kapitalertragsteuer + soli + kirchensteuer
-
-        # Subtract accumulated Quellensteuer
         final_tax -= self.anrechenbare_quellensteuer
+
+        # §23 EStG: Private Veräußerungsgeschäfte (physical gold, crypto < 1yr)
+        # §23 Abs.3 Satz 5 EStG: Freigrenze €1,000 — all-or-nothing
+        # If total §23 gains exceed €1,000: entire gain taxable at personal rate
+        # If under €1,000: €0 tax. Losses offset only within §23.
+        if self.private_veraeusserungs_gewinne > 1000.0 and personal_tax_rate > 0:
+            s23_taxable = self.private_veraeusserungs_gewinne
+            s23_tax = s23_taxable * personal_tax_rate
+            s23_soli = s23_tax * 0.055
+            s23_kirchensteuer = s23_tax * kirchensteuer_rate
+            final_tax += s23_tax + s23_soli + s23_kirchensteuer
 
         return max(final_tax, 0.0)

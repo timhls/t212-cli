@@ -29,19 +29,19 @@ def test_vorabpauschale() -> None:
         engine.process_event(buy_event)
 
         # Process year end for 2024
-        # 100 * 0.0255 * 0.7 = 1.785 base return per share
-        # Actual return: 110 - 100 = 10
-        # Min: 1.785
-        # 1/12 rule: bought in April -> 8 months -> 8/12
-        # Wait: prior months = 3 (Jan, Feb, Mar). So (12-3)/12 = 9/12
-        # Wait, the prompt says "reduced by 3/12". 12 - 3 = 9. So 9/12.
-        # TFS: 30% -> * 0.7
-        # Total per share: 1.785 * (9/12) * 0.7 = 0.937125
-        # Total for 10 shares: 9.37125
+        # §18 InvStG: Basisertrag = 100 * 0.0255 * 0.7 = 1.785/share
+        # §18 Abs.2: 1/12 rule — bought April, months_prior=3 → factor 9/12
+        # Basisertrag (prorated) = 1.785 * 9/12 = 1.33875/share
+        # Wertsteigerung = 110 - 100 = 10/share (full year, not prorated)
+        # Vorabpauschale = min(1.33875, 10) = 1.33875/share
+        # Total (pre-TFS, full amount per §19 Abs.1 Satz 4): 1.33875 * 10 = 13.3875
         engine.process_year_end(year=2024, basiszins=0.0255)
 
         tranche = engine.inventory["IE00B4L5Y983"][0]
-        assert abs(tranche.accumulated_vorabpauschale - 9.37125) < 0.001
+        # accumulated_vorabpauschale stores FULL amount (without TFS)
+        assert abs(tranche.accumulated_vorabpauschale - 13.3875) < 0.001
+        # §18 Abs.3 InvStG: taxable portion = 13.3875 * (1 - 0.30) = 9.37125
+        assert abs(engine.taxable_gains - 9.37125) < 0.001
 
         # Sell in 2025
         sell_event = TaxEvent(
@@ -55,9 +55,10 @@ def test_vorabpauschale() -> None:
         engine.process_event(sell_event)
 
         # Gross gain = 10 * 120 - 10 * 100 = 200
-        # Minus Vorabpauschale = 200 - 9.37125 = 190.62875
-        # Apply TFS = 190.62875 * 0.7 = 133.44
-        assert abs(engine.taxable_gains - 133.440125) < 0.001
+        # §19 Abs.1 Satz 4: minus FULL accumulated Vorabpauschale = 200 - 13.3875 = 186.6125
+        # Apply TFS = 186.6125 * 0.7 = 130.62875
+        # Total taxable_gains = 9.37125 (vorab) + 130.62875 (sale) = 140.00
+        assert abs(engine.taxable_gains - 140.00) < 0.001
 
 
 def test_dividends() -> None:

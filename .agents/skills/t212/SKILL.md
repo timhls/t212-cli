@@ -217,14 +217,48 @@ handles this automatically.
 
 ## Tax Module (German Tax Reporting)
 
-The CLI includes German tax reporting via FIFO cost basis calculation:
+The CLI includes German tax reporting via FIFO cost basis calculation,
+validated against the authoritative tax reference:
+[references/german-capital-investment-taxation.md](references/german-capital-investment-taxation.md)
+("Die Besteuerung privater Kapitalanlagen", legal stand July 2027).
+
+**All tax calculations in `calculator.py` follow the formulas, rates, and
+rules specified in that reference.** When modifying tax code, consult the
+reference for the exact legal basis (§20 EStG, §23 EStG, InvStG).
+
+### What the engine computes
 
 - **Classify instruments**: Auto-detect fund type (thesaurierend/ausschüttend)
   via Finanzfluss scraping
 - **FiFo engine**: Computes capital gains using First-In-First-Out matching
+  (§20 Abs.6 EStG, §23 Abs.1 Satz 1 Nr.2 Satz 3 EStG)
 - **Config**: Stores instrument classifications locally at `~/.t212/tax_config.yml`
-- **Vorabpauschale**: Preliminary lump-sum calculation for German investment
-  funds (separate script)
+- **Vorabpauschale**: §18 InvStG preliminary lump-sum calculation for
+  thesaurierende/teilthesaurierende Fonds, taxed at year end on first business
+  day of the following year
+
+### Key rules implemented (per reference)
+
+| Rule | Legal basis | Reference section |
+|------|------------|-----------------|
+| Abgeltungsteuer 25% + Soli 5.5% | §32d Abs.1 EStG | "Zinserträge, Dividenden" |
+| Kirchensteuer reduction of KeSt | §32d Abs.1 Satz 3 EStG | Tax table (lines 22-27) |
+| Sparer-Pauschbetrag €1,000 | §20 Abs.9 EStG | Formula section |
+| Aktien losses only offset Aktien gains | §20 Abs.6 Satz 4 EStG | "Verlustverrechnung" |
+| §23 Freigrenze €1,000 (all-or-nothing) | §23 Abs.3 Satz 5 EStG | "Physisches Gold" |
+| Teilfreistellung 30%/15%/0% | §20 InvStG | "Investmentfonds" |
+| Vorabpauschale basiszins + 70% factor | §18 Abs.1 InvStG | Formula section |
+| 1/12 rule for mid-year purchases | §18 Abs.2 InvStG | Formula section |
+| Vorabpauschale deducted at sale without TFS | §19 Abs.1 Satz 4 InvStG | Formula section |
+| FIFO mandatory for crypto | §23 Abs.1 Satz 1 Nr.2 Satz 3 EStG | "Bitcoin" |
+| Gold-ETC with delivery = §23 (tax-free >1yr) | BFH VIII R 4/15 | "Gold-ETCs" |
+
+### Basiszins values
+
+| Year | Basiszins | Tax due |
+|------|-----------|---------|
+| 2025 | 2.53% | 2 Jan 2026 |
+| 2026 | 3.20% | 4 Jan 2027 |
 
 ## ETF Data
 
