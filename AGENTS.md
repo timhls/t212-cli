@@ -129,6 +129,16 @@ CLI commands: get client → call method → pretty-print → catch errors.
 - **Config system**: Stores instrument classifications locally
 - **Scraper**: Auto-detects fund types (thesaurierend/ausschüttend)
 
+## Git Workflow
+
+This project uses **trunk-based development**:
+
+- **`main` is the only long-lived branch.** All changes commit directly to `main`.
+- Do not create feature branches unless explicitly asked. Commit work to `main`.
+- Keep commits small and focused so `main` stays always-green (builds and tests pass).
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages (e.g., `fix:`, `feat:`, `chore:`, `docs:`).
+- Pull before pushing and rebase onto the latest `main` if behind.
+
 ## Release Process
 
 Uses `python-semantic-release` for automated releases via GitHub Actions.
