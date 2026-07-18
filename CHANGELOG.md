@@ -2,6 +2,45 @@
 
 
 
+## v1.3.0 (2026-07-18)
+
+### Ci
+
+* ci: pin setup-uv to v8.3.2 (no moving v8 major tag exists) ([`bb02a93`](https://github.com/timhls/t212-cli/commit/bb02a931a882c0aff531abf589a682b645b7a5f4))
+
+* ci: bump checkout to v7, setup-uv to v8, setup-python to v6 ([`16d66d3`](https://github.com/timhls/t212-cli/commit/16d66d390468c97161e4a3d5281428c53bc71711))
+
+### Documentation
+
+* docs: document 212 Card and API limitations in t212 skill ([`dc8fa1b`](https://github.com/timhls/t212-cli/commit/dc8fa1b822053a96269366bd5531969edd1d4982))
+
+* docs: add trunk-based development workflow to AGENTS.md ([`a2ec580`](https://github.com/timhls/t212-cli/commit/a2ec580980109b5947d64fbfbf1d3e9e785cd780))
+
+### Feature
+
+* feat(pies): add history command for daily value reconstruction
+
+The T212 API exposes no historical portfolio/pie value endpoint. This adds
+reconstruction of daily pie value series by fetching per-component close
+prices via Yahoo Finance, FX-normalizing to a target currency, and
+multiplying by current owned quantity.
+
+New modules:
+- tax/yahoo_symbols.py: ISIN to Yahoo ticker resolver (curated map + search)
+- tax/history.py: fetch_pie_history service + PieHistory dataclasses
+- tax/charts.py: ASCII line chart + summary table renderer
+
+New CLI command:
+  t212 pies history &lt;id&gt; [--days N] [--currency EUR] [--height H]
+                  [--per-component/--no-per-component] [--json]
+
+Gotchas handled: bare ISIN yfinance lookups return wrong prices;
+GBpEUR=X ignores pence convention; .L suffix does not imply GBp currency;
+pie cash not on get_pie_by_id response.
+
+All 159 tests pass; ruff and mypy strict green. ([`2c6934a`](https://github.com/timhls/t212-cli/commit/2c6934ac4d91f09752d434f1f0477ba24ed10fd7))
+
+
 ## v1.2.3 (2026-07-10)
 
 ### Fix
