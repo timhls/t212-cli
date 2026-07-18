@@ -6,6 +6,13 @@ from rich.console import Console
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import MarketRequest, PieRequest, DuplicateBucketRequest
 from t212_cli.cli.tax import app as tax_app
+from t212_cli.tax.charts import (
+    SummaryRow,
+    fmt_date_range,
+    render_line_chart,
+    render_summary_table,
+)
+from t212_cli.tax.history import fetch_pie_history, summary_stats
 from t212_cli.tax.justetf import scrape_justetf, enrich_profile_with_yahoo
 from t212_cli.tax.pie_analysis import analyze_pie
 
@@ -245,6 +252,162 @@ def pies_analyze(
         console.print_json(json.dumps(data, default=str))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+
+
+@pies_app.command("history")
+def pies_history(
+    pie_id: int,
+    days: int = typer.Option(
+        30, "--days", "-d", help="Number of calendar days of history"
+    ),
+    currency: str = typer.Option(
+        "EUR", "--currency", "-c", help="Target currency for all values"
+    ),
+    height: int = typer.Option(
+        16, "--height", help="Chart height in rows (aggregate chart)"
+    ),
+    per_component: bool = typer.Option(
+        True,
+        "--per-component/--no-per-component",
+        help="Also render a chart per individual component",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Output raw JSON instead of charts"
+    ),
+) -> None:
+    """Reconstruct daily value history for a pie.
+
+    Fetches the current pie composition, resolves each component ISIN to a
+    Yahoo Finance symbol, and pulls daily close prices for the requested
+    window. Values are FX-normalized to the target currency and multiplied
+    by the current owned quantity per component.
+
+    Caveats:
+    - Quantities are assumed constant across the window (T212 API exposes
+      only current holdings, not historical snapshots).
+    - Price return only — dividends not included.
+    """
+    client = get_client()
+    try:
+        pie = fetch_pie_history(client, pie_id, days=days, target_currency=currency)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return
+
+    if not pie.components:
+        console.print(
+            f"[yellow]No components with price data found for pie {pie_id}.[/yellow]"
+        )
+        return
+
+    if json_out:
+        payload = {
+            "pie_id": pie.pie_id,
+            "pie_name": pie.pie_name,
+            "currency": pie.target_currency,
+            "cash": pie.cash,
+            "date_range": {
+                "start": pie.start_date.isoformat(),
+                "end": pie.end_date.isoformat(),
+            },
+            "aggregate": [
+                {"date": d.isoformat(), "value": float(v)}
+                for d, v in pie.aggregate_value.items()
+            ],
+            "components": [
+                {
+                    "ticker": c.ticker,
+                    "isin": c.isin,
+                    "yahoo_symbol": c.yahoo_symbol,
+                    "quantity": c.quantity,
+                    "fund_currency": c.fund_currency,
+                    "series": [
+                        {"date": d.isoformat(), "value": float(v)}
+                        for d, v in c.value_history.items()
+                    ],
+                }
+                for c in pie.components
+            ],
+        }
+        console.print_json(json.dumps(payload, default=str))
+        return
+
+    # === Header ===
+    console.rule(
+        f"[bold cyan]Pie '{pie.pie_name}' ({pie.pie_id}) — "
+        f"{days}-day value history[/bold cyan]"
+    )
+    console.print(
+        f"[dim]Range: {fmt_date_range(pie.start_date, pie.end_date)}  "
+        f"·  Currency: {currency}  ·  Cash: {pie.cash:,.2f} {currency}[/dim]"
+    )
+    console.print(
+        "[dim]Assumes constant quantities; price return only (no dividends).[/dim]"
+    )
+    console.print()
+
+    # === Aggregate chart ===
+    agg_stats = summary_stats(pie.aggregate_value)
+    color = "green" if agg_stats.get("pct_change", 0.0) >= 0 else "red"
+    console.print(
+        f"[bold]Aggregate pie value[/bold]  "
+        f"{agg_stats.get('start_value', 0):,.2f} → "
+        f"{agg_stats.get('end_value', 0):,.2f} {currency}  "
+        f"[{color}]{agg_stats.get('pct_change', 0):+.2f}%[/{color}]  "
+        f"[dim]min {agg_stats.get('min_value', 0):,.2f} · "
+        f"max {agg_stats.get('max_value', 0):,.2f} · "
+        f"vol {agg_stats.get('volatility_pct', 0):.1f}%[/dim]"
+    )
+    console.print()
+    render_line_chart(
+        pie.aggregate_value,
+        title=f"Total pie value ({currency})",
+        currency=currency,
+        height=height,
+        color=color,
+        console=console,
+    )
+    console.print()
+
+    # === Per-component summary + charts ===
+    rows: list[SummaryRow] = []
+    for c in pie.components:
+        stats = summary_stats(c.value_history)
+        rows.append(
+            {
+                "ticker": c.ticker,
+                "symbol": c.yahoo_symbol,
+                "name": c.isin,
+                "start_value": float(stats.get("start_value", 0.0)),
+                "end_value": float(stats.get("end_value", 0.0)),
+                "pct_change": float(stats.get("pct_change", 0.0)),
+                "values": list(c.value_history.to_numpy()),
+            }
+        )
+
+    render_summary_table(rows, currency=currency, console=console)
+    console.print()
+
+    if per_component:
+        console.rule("[bold cyan]Per-component value charts[/bold cyan]")
+        console.print()
+        for c in pie.components:
+            stats = summary_stats(c.value_history)
+            pct = stats.get("pct_change", 0.0)
+            cc = "green" if pct >= 0 else "red"
+            console.print(
+                f"[bold]{c.ticker}[/bold]  [dim]{c.yahoo_symbol}[/dim]  "
+                f"{c.isin}  ·  qty {c.quantity:.4f}  ·  "
+                f"[{cc}]{pct:+.2f}%[/{cc}]"
+            )
+            render_line_chart(
+                c.value_history,
+                currency=currency,
+                height=8,
+                color=cc,
+                console=console,
+            )
+            console.print()
 
 
 @pies_app.command("delete")

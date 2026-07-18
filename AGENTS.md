@@ -98,13 +98,16 @@ the agent should consult the `t212` skill (`.agents/skills/t212/SKILL.md`).
 │   └── __init__.py      # Pydantic models for API requests/responses
 └── tax/
     ├── calculator.py    # FifoEngine for FIFO tax calculations
+    ├── charts.py        # ASCII chart rendering (line charts, sparklines, summary tables)
     ├── config.py        # Tax configuration loading/saving
+    ├── history.py       # Pie historical value reconstruction (prices × qty, FX-normalized)
     ├── justetf.py       # justETF scraper + enrich_profile_with_yahoo()
     ├── market_data.py   # Re-exports get_historical_price from yahoo_finance
     ├── models.py        # Tax-specific Pydantic models (TaxInstrument, EtfProfile, etc.)
     ├── pie_analysis.py  # Pie deep-dive: aggregated holdings, regions, sectors
     ├── scraper.py       # Finanzfluss web scraping for instrument classification
-    └── yahoo_finance.py # yfinance helper with SSL workaround (session, funds data)
+    ├── yahoo_finance.py # yfinance helper with SSL workaround (session, funds data)
+    └── yahoo_symbols.py # ISIN → Yahoo Finance ticker resolver (curated map + search fallback)
 ```
 
 ### CLI Structure with Typer Sub-apps
@@ -128,6 +131,30 @@ CLI commands: get client → call method → pretty-print → catch errors.
 - **Market data**: Historical prices via yfinance
 - **Config system**: Stores instrument classifications locally
 - **Scraper**: Auto-detects fund types (thesaurierend/ausschüttend)
+
+### Pie History Module
+
+- **`tax/history.py`**: Reconstructs daily pie value series. The T212 API exposes
+  only current snapshots — no historical portfolio/pie value endpoint. This
+  module fetches per-component close prices via Yahoo Finance, resolves each
+  ISIN to a proper exchange-suffixed Yahoo symbol (via `tax/yahoo_symbols.py`),
+  FX-normalizes to the target currency, multiplies by current owned quantity
+  per component, and aggregates into a daily pie value series.
+- **`tax/charts.py`**: ASCII line-chart renderer using Unicode block
+  characters and `rich` (no external plotting deps). NaN-safe sparkline.
+- **`tax/yahoo_symbols.py`**: ISIN → Yahoo symbol resolver. Curated static
+  map for known European UCITS ETFs/ETCs (verified working) + Yahoo search
+  API fallback that picks the most liquid listing on a major European
+  exchange (LSE > XETRA > AMS > PA > MI).
+
+**Gotchas** (non-obvious, discovered during build):
+- Bare ISIN lookups in yfinance return **wrong** prices (fuzzy match to
+  random funds). Always resolve via exchange-suffixed symbol.
+- Yahoo's `GBpEUR=X` actually returns the GBP→EUR rate (ignores pence
+  convention). GBp rates must be divided by 100 after fetching.
+- The `.L` suffix does **not** imply GBp currency — some LSE-quoted ETFs
+  are USD-denominated. Query `ticker.fast_info["currency"]` at runtime.
+- Pie cash is not on `get_pie_by_id()` response; fetch via `get_pies()`.
 
 ## Git Workflow
 

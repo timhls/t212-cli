@@ -111,6 +111,15 @@ uv run t212 pies analyze 12345 --top 50
 # Analyze without Yahoo Finance enrichment (justETF only)
 uv run t212 pies analyze 12345 --no-yahoo
 
+# Daily value history chart (last 30 days, EUR-normalized)
+uv run t212 pies history 12345 --days 30
+
+# Aggregate chart only (skip per-component sub-charts)
+uv run t212 pies history 12345 --days 90 --no-per-component
+
+# JSON output (date → value series) for piping into other tools
+uv run t212 pies history 12345 --days 60 --json
+
 # Create a pie from JSON
 uv run t212 pies create '{"name":"Tech","instrumentShares":{"AAPL_US_EQ":0.5,"MSFT_US_EQ":0.5}}'
 
@@ -266,6 +275,22 @@ purchases"), the agent should:
     detailed transaction data, suggest CSV exports via the app or
     `POST /equity/history/exports` (though exports are also limited to the
     same fields).
+13. **Yahoo Finance bare-ISIN lookups return wrong prices**: yfinance
+    fuzzy-matches bare ISINs to random unrelated funds. Always resolve via
+    a proper exchange-suffixed symbol (e.g. `IWFV.L`, `XDWD.L`, `WNUC.DE`).
+    The `tax/yahoo_symbols.py` module handles this with a curated map +
+    Yahoo search API fallback.
+14. **Yahoo `GBpEUR=X` ignores pence convention**: Despite the name, Yahoo's
+    `GBpEUR=X` actually returns the GBP→EUR rate (~1.17), not pence→EUR
+    (~0.0118). `tax/history.py:_fetch_fx()` divides GBp rates by 100 to
+    correct this.
+15. **`.L` suffix ≠ GBp currency**: Some LSE-quoted ETFs are USD-denominated
+    (e.g. `XDWD.L`, `IEMA.L`). `tax/history.py` queries
+    `ticker.fast_info["currency"]` at runtime rather than assuming based on
+    the exchange suffix.
+16. **Pie cash not on detailed response**: `get_pie_by_id()` returns no cash
+    field. `tax/history.py:fetch_pie_history()` fetches cash via
+    `get_pies()` and matches by ID.
 
 ## Tax Module (German Tax Reporting)
 
@@ -352,6 +377,31 @@ Output includes:
 - `sectors`: Pie-weighted sector/industry breakdown
 - `etf_profiles`: Per-ETF metadata (name, ISIN, share)
 - `components_without_data`: Tickers where no ETF profile was found
+
+## Pie History
+
+The `tax/history.py` module reconstructs daily pie value series — the T212 API
+exposes only current snapshots, no historical values endpoint.
+
+- **`fetch_pie_history()`**: Fetches the pie, resolves each component ISIN to a
+  Yahoo Finance ticker (via `tax/yahoo_symbols.py`), pulls daily close prices
+  via yfinance, FX-normalizes to the target currency, multiplies by current
+  owned quantity per component, and aggregates into a daily pie value series.
+- **`PieHistory` / `ComponentHistory`**: Dataclasses holding per-component and
+  aggregate daily value series as pandas Series.
+- **`summary_stats()`**: Returns start/end/min/max/abs_change/pct_change and
+  annualized volatility for a value series.
+
+Output of `t212 pies history <id>`:
+- Aggregate pie value chart (ASCII line chart via `tax/charts.py`)
+- Per-component summary table (start value, latest value, % change, sparkline)
+- Optional per-component ASCII line charts
+
+**Assumptions** (per T212 API limitations):
+- Quantities held are assumed constant across the window (no historical
+  holdings snapshot is available).
+- Price return only — dividends not included in the value series.
+- Cash inside the pie is treated as a constant baseline.
 
 ## Further reading
 
