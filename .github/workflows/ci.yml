@@ -16,7 +16,7 @@ permissions:
 jobs:
   analyze-and-test:
     name: Lint, Scan, and Test
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-t212-cli
 
     steps:
       # 1. Check out the code
@@ -47,9 +47,9 @@ jobs:
           # Checks for formatting issues (optional but recommended)
           uv run ruff format --check .
 
-      # 4.5. Run Mypy (Type Checking)
+      # 4.5. Run Mypy (Type Checking) — package lives under .agents/skills/t212/scripts
       - name: Type check with Mypy
-        run: uv run mypy .
+        run: uv run mypy .agents/skills/t212/scripts/t212_cli/
 
       # 5. Run Bandit (Replaces Sonar's Security/SAST check)
       - name: Security Scan with Bandit

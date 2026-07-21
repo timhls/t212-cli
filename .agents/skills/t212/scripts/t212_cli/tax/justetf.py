@@ -80,39 +80,54 @@ def _extract_name(soup: BeautifulSoup) -> Optional[str]:
 
 
 def _extract_basics(soup: BeautifulSoup) -> dict[str, Any]:
+    """Extract ETF basics from the justETF page.
+
+    justETF renders the basics as a table where each row carries
+    ``data-testid="etf-basics_row_{slug}"`` and most value cells carry
+    ``data-testid="tl_etf-basics_value_{slug}"``. The fund-size cell is an
+    exception (no testid on its value), so it is located via its row's second
+    ``<td>``. Older versions of the page used ``<dt>/<dd>`` siblings.
+    """
     basics: dict[str, Any] = {}
 
-    label_map = {
-        "Total expense ratio": "ter",
-        "Distribution policy": "distribution_policy",
-        "Fund size": "fund_size_eur",
-        "Fund currency": "fund_currency",
-        "Replication": "replication",
+    # Map justETF's slugified keys to our field names.
+    slug_to_field = {
+        "ter": "ter",
+        "fund-currency": "fund_currency",
+        "replication": "replication",
+        "distribution-policy": "distribution_policy",
     }
 
-    for dt in soup.find_all("dt"):
-        label = dt.get_text(strip=True)
-        dd = dt.find_next_sibling("dd")
-        if not dd:
+    for slug, field in slug_to_field.items():
+        cell = soup.find(attrs={"data-testid": f"tl_etf-basics_value_{slug}"})
+        if not cell:
             continue
-        value = dd.get_text(strip=True)
-        if not value:
-            continue
-
-        key = label_map.get(label)
-        if not key:
+        raw = cell.get_text(strip=True)
+        if not raw or raw == "-":
             continue
 
-        if key == "ter":
-            m = re.search(r"([\d.]+)%", value)
+        if field == "ter":
+            m = re.search(r"([\d.]+)\s*%", raw)
             if m:
-                basics[key] = float(m.group(1)) / 100.0
-        elif key == "fund_size_eur":
-            m = re.search(r"EUR\s*([\d,.]+)\s*m", value)
-            if m:
-                basics[key] = float(m.group(1).replace(",", ""))
+                basics[field] = float(m.group(1)) / 100.0
+        elif field == "replication":
+            # Cell contains two spans: replication + method. Joined text works.
+            basics[field] = raw
         else:
-            basics[key] = value
+            basics[field] = raw
+
+    # Fund size: locate the row by label, take the second <td>'s text.
+    # Structure: <tr data-testid="etf-basics_row_fund-size">
+    #              <td class="vallabel">Fund size</td>
+    #              <td>EUR 19,830 m <span .../></td>
+    fs_row = soup.find(attrs={"data-testid": "etf-basics_row_fund-size"})
+    if fs_row:
+        tds = fs_row.find_all("td", recursive=False) or fs_row.find_all("td")
+        if len(tds) >= 2:
+            raw_size = tds[1].get_text(strip=True)
+            m = re.search(r"EUR\s*([\d,.]+)\s*m", raw_size, re.IGNORECASE)
+            if m:
+                basics["fund_size_eur"] = float(m.group(1).replace(",", ""))
 
     return basics
 

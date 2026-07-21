@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-t212-cli
     permissions:
       contents: write
       id-token: write

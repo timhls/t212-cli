@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import base64
 import os
+import time
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -806,3 +807,67 @@ def test_get_historical_orders_applies_limit_validation(
     args, kwargs = mock_get.call_args
     params = kwargs.get("params") or {}
     assert params.get("limit") == 50
+
+
+# === Rate-limit retry tests ===
+
+
+def test_rate_limit_wait_seconds_prefers_reset_timestamp() -> None:
+    """_rate_limit_wait_seconds computes wait from x-ratelimit-reset."""
+    from t212_cli.client.base import _rate_limit_wait_seconds
+
+    resp = MagicMock()
+    resp.headers = {
+        "x-ratelimit-reset": str(time.time() + 30),
+        "Retry-After": "1",
+    }
+    wait = _rate_limit_wait_seconds(resp)
+    assert 28 <= wait <= 32
+
+
+def test_rate_limit_wait_seconds_falls_back_to_retry_after() -> None:
+    """Falls back to Retry-After when x-ratelimit-reset is missing."""
+    from t212_cli.client.base import _rate_limit_wait_seconds
+
+    resp = MagicMock()
+    resp.headers = {"Retry-After": "5"}
+    assert _rate_limit_wait_seconds(resp) == 5.0
+
+
+def test_rate_limit_wait_seconds_defaults_on_no_headers() -> None:
+    """Uses exponential backoff default when neither header is present."""
+    from t212_cli.client.base import (
+        _rate_limit_wait_seconds,
+        _RATE_LIMIT_INITIAL_BACKOFF,
+    )
+
+    resp = MagicMock()
+    resp.headers = {}
+    assert _rate_limit_wait_seconds(resp) == _RATE_LIMIT_INITIAL_BACKOFF
+
+
+def test_get_retries_on_429_then_succeeds(client: Trading212Client) -> None:
+    """_get retries on 429 and returns the successful response."""
+    ok_response = _mock_response({"ok": True})
+    rate_limited = MagicMock()
+    rate_limited.status_code = 429
+    rate_limited.headers = {"Retry-After": "0"}
+    rate_limited.raise_for_status = MagicMock()
+
+    with patch.object(client.client, "get", side_effect=[rate_limited, ok_response]):
+        result = client.get_account_summary()
+
+    assert result is not None
+
+
+def test_get_raises_after_max_retries(client: Trading212Client) -> None:
+    """_get raises after _RATE_LIMIT_MAX_RETRIES + 1 attempts."""
+
+    rate_limited = MagicMock()
+    rate_limited.status_code = 429
+    rate_limited.headers = {"Retry-After": "0"}
+    rate_limited.raise_for_status = MagicMock()
+
+    with patch.object(client.client, "get", side_effect=[rate_limited]):
+        with pytest.raises(Exception):
+            client.get_account_summary()

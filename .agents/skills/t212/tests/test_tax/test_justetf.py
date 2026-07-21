@@ -30,13 +30,28 @@ JUSTETF_HTML = """
     <tr><td>Other</td><td>35.99%</td></tr>
   </table>
 </div>
-<dl>
-  <dt>Total expense ratio</dt><dd>0.12% p.a.</dd>
-  <dt>Distribution policy</dt><dd>Accumulating</dd>
-  <dt>Fund size</dt><dd>EUR 19,862m</dd>
-  <dt>Fund currency</dt><dd>USD</dd>
-  <dt>Replication</dt><dd>Physical (Optimized sampling)</dd>
-</dl>
+<table>
+  <tr data-testid="etf-basics_row_ter">
+    <td class="vallabel" data-testid="etf-basics_label_ter">Total expense ratio</td>
+    <td><div class="val" data-testid="tl_etf-basics_value_ter">0.12% p.a.</div></td>
+  </tr>
+  <tr data-testid="etf-basics_row_fund-size">
+    <td class="vallabel" data-testid="etf-basics_label_fund-size">Fund size</td>
+    <td>EUR 19,862m <span class="indicator-3 indicator-3--green ml-2"></span></td>
+  </tr>
+  <tr data-testid="etf-basics_row_distribution-policy">
+    <td class="vallabel" data-testid="etf-basics_label_distribution-policy">Distribution policy</td>
+    <td data-testid="tl_etf-basics_value_distribution-policy">Accumulating</td>
+  </tr>
+  <tr data-testid="etf-basics_row_fund-currency">
+    <td class="vallabel" data-testid="etf-basics_label_fund-currency">Fund currency</td>
+    <td data-testid="tl_etf-basics_value_fund-currency">USD</td>
+  </tr>
+  <tr data-testid="etf-basics_row_replication">
+    <td class="vallabel" data-testid="etf-basics_label_replication">Replication</td>
+    <td><span data-testid="tl_etf-basics_value_replication">Physical</span><span data-testid="tl_etf-basics_value_replication-method">(Optimized sampling)</span></td>
+  </tr>
+</table>
 </body></html>
 """
 

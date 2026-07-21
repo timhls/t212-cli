@@ -10,7 +10,7 @@ compatibility: Requires Python 3.14+, uv, and Trading 212 API credentials
   (T212_API_KEY_ID, T212_SECRET_KEY).
 metadata:
   author: timoh
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ## When to use
@@ -336,7 +336,10 @@ The tax/FIFO engine in `tax/calculator.py` reads `fill.walletImpact.taxes` and
 3. **Pies API is deprecated**: Still functional but will not receive updates.
 4. **Market orders may slip**: Final execution price may differ from placement
    price, especially for illiquid instruments.
-5. **Rate limits are per-account**, not per-key or per-IP.
+5. **Rate limits are per-account**, not per-key or per-IP. The client
+   automatically retries on `429` by waiting until the window reset
+   (`x-ratelimit-reset` timestamp), up to 5 times. History endpoints
+   (6 req/min) are the most common chokepoint during full-portfolio fetches.
 6. **Historical data pagination**: Uses cursor-based pagination via
    `nextPagePath` (`limit` default 20, max 50). The client provides
    `iter_all_orders()`, `iter_all_dividends()`, `iter_all_transactions()`

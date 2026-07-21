@@ -34,6 +34,10 @@ _HISTORY_LIMIT_MAX = 50
 _HISTORY_LIMIT_MIN = 1
 # Safety guard against infinite pagination loops if the API misbehaves
 _MAX_PAGINATION_PAGES = 10_000
+# 429 rate-limit retry behaviour (spec: per-account limits on every endpoint)
+_RATE_LIMIT_MAX_RETRIES = 5
+_RATE_LIMIT_INITIAL_BACKOFF = 5.0
+_RATE_LIMIT_MAX_BACKOFF = 60.0
 
 
 def _validate_limit(limit: int) -> int:
@@ -63,6 +67,36 @@ def _cursor_from_next_page_path(next_page_path: str) -> Optional[str]:
     query = urllib.parse.parse_qs(parsed.query)
     values = query.get("cursor")
     return values[0] if values else None
+
+
+def _rate_limit_wait_seconds(response: httpx.Response) -> float:
+    """Compute how long to wait before retrying after a 429 response.
+
+    The Trading 212 spec exposes:
+    - ``Retry-After``: seconds until *one* request slot frees up. Often too
+      optimistic when bursting is exhausted.
+    - ``x-ratelimit-reset``: Unix timestamp when the window fully resets and
+      ``x-ratelimit-limit`` requests become available again.
+
+    Prefer ``x-ratelimit-reset`` (full reset) to avoid re-hitting 429 on
+    every retry; fall back to ``Retry-After`` if missing; otherwise use
+    exponential backoff.
+    """
+    reset_ts = response.headers.get("x-ratelimit-reset")
+    if reset_ts:
+        try:
+            wait = max(0.0, float(reset_ts) - time.time()) + 1.0
+            if wait > 0:
+                return wait
+        except ValueError:
+            pass
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return float(retry_after)
+        except ValueError:
+            pass
+    return _RATE_LIMIT_INITIAL_BACKOFF
 
 
 class Trading212Client:
@@ -100,27 +134,49 @@ class Trading212Client:
         self._ticker_to_isin: Optional[dict[str, str]] = None
         self._isin_to_ticker: Optional[dict[str, str]] = None
 
+    def _request_with_rate_limit_retry(
+        self, method: str, url: str, **kwargs: Any
+    ) -> httpx.Response:
+        """Issue an HTTP request, retrying on 429 with Retry-After / backoff.
+
+        Dispatches to the underlying client's ``get``/``post``/``delete``
+        methods (not the generic ``request``) so callers and tests mocking
+        those individual methods keep working.
+
+        The Trading 212 spec documents per-account rate limits on every
+        endpoint (e.g. 6 req/min on history endpoints). On 429 the response
+        carries a ``Retry-After`` header (seconds) and ``x-ratelimit-reset``
+        (Unix timestamp when the window fully resets). The reset timestamp is
+        authoritative for long windows; ``Retry-After`` is often optimistic.
+        Capped at ``_RATE_LIMIT_MAX_RETRIES`` attempts.
+        """
+        method_lower = method.lower()
+        http_method = getattr(self.client, method_lower)
+        for attempt in range(_RATE_LIMIT_MAX_RETRIES + 1):
+            response: httpx.Response = http_method(url, **kwargs)
+            if response.status_code != 429 or attempt == _RATE_LIMIT_MAX_RETRIES:
+                response.raise_for_status()
+                return response
+            wait = _rate_limit_wait_seconds(response)
+            time.sleep(min(wait, _RATE_LIMIT_MAX_BACKOFF))
+        # Unreachable: loop returns on the last attempt, but satisfy mypy.
+        raise RuntimeError("rate-limit retry loop exhausted")
+
     def _get(
         self, endpoint: str, params: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
-        response = self.client.get(url, params=params)
-        response.raise_for_status()
-        return response
+        return self._request_with_rate_limit_retry("GET", url, params=params)
 
     def _post(
         self, endpoint: str, json_data: Optional[dict[str, Any]] = None
     ) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
-        response = self.client.post(url, json=json_data)
-        response.raise_for_status()
-        return response
+        return self._request_with_rate_limit_retry("POST", url, json=json_data)
 
     def _delete(self, endpoint: str) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
-        response = self.client.delete(url)
-        response.raise_for_status()
-        return response
+        return self._request_with_rate_limit_retry("DELETE", url)
 
     # 1. Accounts
     def get_account_summary(self) -> AccountSummary:
