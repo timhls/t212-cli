@@ -2,6 +2,81 @@
 
 
 
+## v1.4.0 (2026-07-21)
+
+### Chore
+
+* chore: track .envrc (no secrets, KeePass lookups via $KDBX)
+
+- Align .envrc to wtr-pro-homelab pattern: KDBX=&#34;${KDBX:-$HOME/KeePassXC/keepass.kdbx}&#34;
+- Remove .envrc from .gitignore so the loader is committed
+- Add &#39;unset DB_PASS&#39; after lookup (parity with phase6-cli)
+- No secrets in file: T212 creds fetched on demand via keepassxc-cli
+- gitleaks clean ([`f2c6536`](https://github.com/timhls/t212-cli/commit/f2c65368e8defb47ed2532a956e7b40889b83f35))
+
+* chore(deps): Update dependency types-requests to v2.33.0.20260712 ([`3ddc07a`](https://github.com/timhls/t212-cli/commit/3ddc07a9e02df0b15f998f3638ac35fb90a5ce76))
+
+* chore(deps): Update dependency typer to v0.27.0 ([`b41ab0a`](https://github.com/timhls/t212-cli/commit/b41ab0a5f574378a1f854ffd76526ba1b98405f5))
+
+* chore(deps): Update dependency pytest-cov to v7.1.0 ([`3e88061`](https://github.com/timhls/t212-cli/commit/3e880618a6172d9f58868c865af67348eecf1a31))
+
+* chore(deps): Update dependency mypy to v1.20.2 ([`fc0d2ed`](https://github.com/timhls/t212-cli/commit/fc0d2ed649c2ddbd9ea6bd92628c9df1babeb8fb))
+
+### Feature
+
+* feat(t212): align client, CLI, and docs with official Trading 212 spec
+
+Refresh api.yaml from docs.trading212.com and regenerate Pydantic models
+via datamodel-codegen (adds INSTRUMENT_AUTOINVEST to InitiatedFrom).
+
+Client enhancements:
+- Unify cursor params to Optional[str] across history endpoints
+- Add _validate_limit clamping to spec max of 50 items per page
+- Add iter_all_orders/dividends/transactions generators that follow
+  nextPagePath automatically (replaces hand-rolled loop in tax fifo-report)
+- Add wait_for_report polling helper implementing the async CSV report
+  workflow described in the spec
+
+New CLI commands:
+- orders limit/stop/stop-limit (client methods were unexposed before)
+- history exports list / request [--wait] sub-app
+
+Docs:
+- references/api.md: fix stale quickstart URL, add Schemas section
+  covering walletImpact (Position/Fill), Tax, reports workflow, order sign
+  convention, and the InitiatedFrom enum
+- SKILL.md: document new commands, walletImpact schemas, async reports
+  workflow, pies rate limits, pagination helpers, and the negative-quantity
+  CLI quirk. Bump skill version 1.1.0 -&gt; 1.2.0.
+
+Tests:
+- Clean up legacy ppl/fxPpl mock in test_get_positions
+- Add 17 client tests (limit validation, cursor parsing, iter_all_*,
+  wait_for_report success/failure/timeout paths)
+- Add 11 CLI tests for the new order and history exports commands
+- Update tax tests to mock iter_all_orders
+
+186 tests pass, ruff clean, mypy strict clean. ([`2c82d9f`](https://github.com/timhls/t212-cli/commit/2c82d9ff7e52b71b4cf43138fb1fc37cc54354fb))
+
+### Unknown
+
+* Merge pull request #6 from timhls/renovate/mypy-1.x
+
+chore(deps): Update dependency mypy to v1.20.2 ([`56fb578`](https://github.com/timhls/t212-cli/commit/56fb578205e1e3228494c2ebc625ba78d44425c3))
+
+* Merge pull request #10 from timhls/renovate/pytest-cov-7.x
+
+chore(deps): Update dependency pytest-cov to v7.1.0 ([`743a561`](https://github.com/timhls/t212-cli/commit/743a56116fdcd305e024ad3a28bb9b688e506192))
+
+* Merge pull request #11 from timhls/renovate/typer-0.x
+
+chore(deps): Update dependency typer to v0.27.0 ([`f425df8`](https://github.com/timhls/t212-cli/commit/f425df88767f85b3b5d26c9a97f57ffafb48491b))
+
+* Merge pull request #12 from timhls/renovate/types-requests-2.x
+
+chore(deps): Update dependency types-requests to v2.33.0.20260712 ([`3770462`](https://github.com/timhls/t212-cli/commit/377046243d7a70bee865bfc7e0ef9fb533403664))
+
+
 ## v1.3.0 (2026-07-18)
 
 ### Ci
