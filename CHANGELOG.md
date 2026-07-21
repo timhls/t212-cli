@@ -2,6 +2,42 @@
 
 
 
+## v1.4.1 (2026-07-21)
+
+### Fix
+
+* fix(t212): rate-limit retry, justETF scraper, CI on WTR Pro
+
+Client:
+- Add 429 rate-limit retry to _get/_post/_delete via
+  _request_with_rate_limit_retry (honours x-ratelimit-reset over the
+  optimistic Retry-After, up to 5 retries). Fixes iter_all_orders pagination
+  exhausting the 6 req/min history budget.
+
+justETF scraper:
+- Fix _extract_basics for current justETF HTML structure: values now live in
+  data-testid=tl_etf-basics_value_{slug} table cells, not &lt;dt&gt;/&lt;dd&gt; pairs.
+  Fund-size cell has no testid — located via its row&#39;s second &lt;td&gt;.
+  Previously TER, fund size, replication, distribution_policy, and
+  fund_currency were silently None on every ETF profile.
+
+CI:
+- Switch ci.yml and release.yml from ubuntu-latest to arc-runner-set-t212-cli
+  (self-hosted ARC runner on WTR Pro, eliminates billable Actions minutes).
+- Fix latent CI bug: mypy . ran on repo root where no .py files live
+  (package is under .agents/skills/t212/scripts/t212_cli/) — every Renovate
+  PR was failing on this. Now targets the real package path.
+
+Tests:
+- Add 5 rate-limit retry tests (reset-timestamp, Retry-After fallback,
+  default backoff, retry-then-succeed, max-retries exhaustion)
+- Update justETF fixture HTML to current data-testid structure
+
+SKILL.md: document rate-limit retry behaviour, bump version 1.2.0 -&gt; 1.3.0.
+
+191 tests pass, ruff clean, mypy strict clean. ([`67461c8`](https://github.com/timhls/t212-cli/commit/67461c8f88bd1e1e0d62cb0ae1315ccdf3212131))
+
+
 ## v1.4.0 (2026-07-21)
 
 ### Chore
