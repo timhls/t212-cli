@@ -128,7 +128,7 @@ def test_tax_report_success(
     mock_res = MagicMock()
     mock_res.items = [mock_order]
     mock_res.nextPagePath = None
-    mock_client.get_historical_orders.return_value = mock_res
+    mock_client.iter_all_orders.return_value = iter([mock_order])
 
     mock_engine = MagicMock()
     mock_engine.year_taxable_gains = 500.0
@@ -200,7 +200,7 @@ def test_tax_report_auto_classify_fallback(
     mock_res = MagicMock()
     mock_res.items = [mock_order]
     mock_res.nextPagePath = None
-    mock_client.get_historical_orders.return_value = mock_res
+    mock_client.iter_all_orders.return_value = iter([mock_order])
 
     mock_scrape.return_value = TaxInstrument(asset_class=AssetClass.AKTIENFONDS)
 
@@ -213,6 +213,7 @@ def test_tax_report_auto_classify_fallback(
 
 @patch("t212_cli.cli.tax.get_client")
 def test_tax_report_pagination(mock_get_client: MagicMock) -> None:
+    """The CLI consumes iter_all_orders (pagination now lives in the client)."""
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
 
@@ -242,16 +243,9 @@ def test_tax_report_pagination(mock_get_client: MagicMock) -> None:
         fill=Fill(filledAt=dt, quantity=1.0, price=10.0),
     )
 
-    # Setup mocked responses for pagination
-    mock_res1 = MagicMock()
-    mock_res1.items = [mock_order]
-    mock_res1.nextPagePath = "/api/v0/equity/history/orders?cursor=123"
-
-    mock_res2 = MagicMock()
-    mock_res2.items = [mock_order]
-    mock_res2.nextPagePath = None
-
-    mock_client.get_historical_orders.side_effect = [mock_res1, mock_res2]
+    # iter_all_orders yields items across pages transparently.
+    # Mock returns 2 items; the CLI should see "Loaded 2 historical orders".
+    mock_client.iter_all_orders.return_value = iter([mock_order, mock_order])
 
     result = runner.invoke(app, ["tax", "fifo-report", "--year", "2024"])
     assert result.exit_code == 0

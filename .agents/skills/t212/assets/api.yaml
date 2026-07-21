@@ -437,7 +437,7 @@ components:
         filledValue:
           description: >-
             The total monetary value of the executed portion of the order.
-            Applicable  to orders placed by value.Note: Placing orders by value
+            Applicable to orders placed by value.Note: Placing orders by value
             is not currently supported via the API but can be done through other
             Trading 212 platforms.
           type: number
@@ -454,6 +454,7 @@ components:
             - WEB
             - SYSTEM
             - AUTOINVEST
+            - INSTRUMENT_AUTOINVEST
           type: string
         instrument:
           $ref: '#/components/schemas/Instrument'
@@ -902,7 +903,7 @@ info:
     ## Quickstart
 
 
-    This simple example shows you how to retrieve your account's cash balance.
+    This simple example shows you how to retrieve your account summary.
 
 
     First, you must generate your API keys from within the Trading 212 app. For
@@ -936,7 +937,7 @@ info:
     credentials.
 
 
-    curl -X GET "https://live.trading212.com/api/v0/equity/account/cash" \
+    curl -X GET "https://live.trading212.com/api/v0/equity/account/summary" \
      -H "Authorization: Basic $CREDENTIALS"
     ```
 

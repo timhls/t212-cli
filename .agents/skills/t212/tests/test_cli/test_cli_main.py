@@ -194,6 +194,158 @@ def test_orders_market_error(mock_env: None, mock_client: MagicMock) -> None:
     assert result.exit_code == 0
 
 
+def test_orders_limit(mock_env: None, mock_client: MagicMock) -> None:
+    mock_model = MagicMock()
+    mock_model.model_dump_json.return_value = '{"id": 1}'
+    mock_client.place_limit_order.return_value = mock_model
+
+    result = runner.invoke(app, ["orders", "limit", "AAPL", "1.0", "180.5"])
+    assert result.exit_code == 0
+    mock_client.place_limit_order.assert_called_once()
+    req = mock_client.place_limit_order.call_args.args[0]
+    assert req.ticker == "AAPL"
+    assert req.quantity == 1.0
+    assert req.limitPrice == 180.5
+
+
+def test_orders_limit_error(mock_env: None, mock_client: MagicMock) -> None:
+    mock_client.place_limit_order.side_effect = Exception("API Error")
+    result = runner.invoke(app, ["orders", "limit", "AAPL", "1.0", "180.5"])
+    assert result.exit_code == 0
+    assert "Error" in result.stdout
+
+
+def test_orders_stop(mock_env: None, mock_client: MagicMock) -> None:
+    mock_model = MagicMock()
+    mock_model.model_dump_json.return_value = '{"id": 1}'
+    mock_client.place_stop_order.return_value = mock_model
+
+    # Negative quantity requires "--" so Click doesn't treat -1.0 as an option
+    result = runner.invoke(app, ["orders", "stop", "--", "AAPL", "-1.0", "170"])
+    assert result.exit_code == 0
+    req = mock_client.place_stop_order.call_args.args[0]
+    assert req.quantity == -1.0
+    assert req.stopPrice == 170
+
+
+def test_orders_stop_error(mock_env: None, mock_client: MagicMock) -> None:
+    mock_client.place_stop_order.side_effect = Exception("API Error")
+    result = runner.invoke(app, ["orders", "stop", "--", "AAPL", "-1.0", "170"])
+    assert result.exit_code == 0
+    assert "Error" in result.stdout
+
+
+def test_orders_stop_limit(mock_env: None, mock_client: MagicMock) -> None:
+    mock_model = MagicMock()
+    mock_model.model_dump_json.return_value = '{"id": 1}'
+    mock_client.place_stop_limit_order.return_value = mock_model
+
+    result = runner.invoke(
+        app, ["orders", "stop-limit", "--", "AAPL", "-1.0", "170", "169.5"]
+    )
+    assert result.exit_code == 0
+    req = mock_client.place_stop_limit_order.call_args.args[0]
+    assert req.stopPrice == 170
+    assert req.limitPrice == 169.5
+
+
+def test_orders_stop_limit_error(mock_env: None, mock_client: MagicMock) -> None:
+    mock_client.place_stop_limit_order.side_effect = Exception("API Error")
+    result = runner.invoke(
+        app, ["orders", "stop-limit", "--", "AAPL", "-1.0", "170", "169.5"]
+    )
+    assert result.exit_code == 0
+    assert "Error" in result.stdout
+
+
+def test_history_exports_list(mock_env: None, mock_client: MagicMock) -> None:
+    mock_model = MagicMock()
+    mock_model.model_dump_json.return_value = '{"reportId": 42, "status": "Finished"}'
+    mock_client.get_historical_exports.return_value = [mock_model]
+
+    result = runner.invoke(app, ["history", "exports", "list"])
+    assert result.exit_code == 0
+
+
+def test_history_exports_list_error(mock_env: None, mock_client: MagicMock) -> None:
+    mock_client.get_historical_exports.side_effect = Exception("API Error")
+    result = runner.invoke(app, ["history", "exports", "list"])
+    assert result.exit_code == 0
+    assert "Error" in result.stdout
+
+
+def test_history_exports_request(mock_env: None, mock_client: MagicMock) -> None:
+    """Non-waiting export request just enqueues and prints reportId."""
+    mock_enqueued = MagicMock()
+    mock_enqueued.reportId = 42
+    mock_client.request_historical_export.return_value = mock_enqueued
+
+    result = runner.invoke(
+        app,
+        [
+            "history",
+            "exports",
+            "request",
+            "2024-01-01T00:00:00Z",
+            "2024-12-31T23:59:59Z",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "42" in result.stdout
+    mock_client.request_historical_export.assert_called_once()
+    # Should NOT poll since --wait was not passed
+    mock_client.wait_for_report.assert_not_called()
+
+
+def test_history_exports_request_with_wait(
+    mock_env: None,
+    mock_client: MagicMock,
+) -> None:
+    """--wait polls and prints downloadLink."""
+    mock_enqueued = MagicMock()
+    mock_enqueued.reportId = 42
+    mock_client.request_historical_export.return_value = mock_enqueued
+
+    mock_finished = MagicMock()
+    mock_finished.model_dump_json.return_value = '{"status": "Finished"}'
+    mock_finished.downloadLink = "https://example.com/r.csv"
+    mock_client.wait_for_report.return_value = mock_finished
+
+    result = runner.invoke(
+        app,
+        [
+            "history",
+            "exports",
+            "request",
+            "2024-01-01T00:00:00Z",
+            "2024-12-31T23:59:59Z",
+            "--wait",
+        ],
+    )
+    assert result.exit_code == 0
+    mock_client.wait_for_report.assert_called_once_with(42, timeout=300.0)
+    assert "https://example.com/r.csv" in result.stdout
+
+
+def test_history_exports_request_error(
+    mock_env: None,
+    mock_client: MagicMock,
+) -> None:
+    mock_client.request_historical_export.side_effect = Exception("API Error")
+    result = runner.invoke(
+        app,
+        [
+            "history",
+            "exports",
+            "request",
+            "2024-01-01T00:00:00Z",
+            "2024-12-31T23:59:59Z",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Error" in result.stdout
+
+
 def test_pies_list(mock_env: None, mock_client: MagicMock) -> None:
     mock_client.get_pies.return_value = []
     result = runner.invoke(app, ["pies", "list"])

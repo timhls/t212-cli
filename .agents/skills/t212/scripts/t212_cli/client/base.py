@@ -1,7 +1,9 @@
 import httpx
 import base64
 import os
-from typing import Optional, List, Any
+import time
+import urllib.parse
+from typing import Any, Iterator, Optional, List
 from t212_cli.models import (
     AccountSummary,
     PaginatedResponseHistoryDividendItem,
@@ -22,7 +24,45 @@ from t212_cli.models import (
     PieRequest,
     DuplicateBucketRequest,
     Position,
+    HistoricalOrder,
+    HistoryDividendItem,
+    HistoryTransactionItem,
 )
+
+# Per spec: "Max items: 50" on /history/orders, /history/dividends, /history/transactions
+_HISTORY_LIMIT_MAX = 50
+_HISTORY_LIMIT_MIN = 1
+# Safety guard against infinite pagination loops if the API misbehaves
+_MAX_PAGINATION_PAGES = 10_000
+
+
+def _validate_limit(limit: int) -> int:
+    """Clamp ``limit`` for the cursor-paginated history endpoints to ``[1, 50]``.
+
+    The Trading 212 spec documents ``Max items: 50`` on
+    ``/equity/history/{orders,dividends,transactions}``. Values outside the
+    valid range are silently clamped rather than raising so callers do not need
+    to pre-validate.
+    """
+    if limit < _HISTORY_LIMIT_MIN:
+        return _HISTORY_LIMIT_MIN
+    if limit > _HISTORY_LIMIT_MAX:
+        return _HISTORY_LIMIT_MAX
+    return limit
+
+
+def _cursor_from_next_page_path(next_page_path: str) -> Optional[str]:
+    """Extract the ``cursor`` query param from a ``nextPagePath`` value.
+
+    The spec instructs callers to reuse the *entire* ``nextPagePath`` string
+    for the next request. Since this client rebuilds params from
+    ``cursor``/``limit``/etc., we parse the cursor out instead. Returns
+    ``None`` if the path has no ``cursor`` param.
+    """
+    parsed = urllib.parse.urlparse(next_page_path)
+    query = urllib.parse.parse_qs(parsed.query)
+    values = query.get("cursor")
+    return values[0] if values else None
 
 
 class Trading212Client:
@@ -91,10 +131,10 @@ class Trading212Client:
     def get_historical_dividends(
         self,
         limit: int = 20,
-        cursor: Optional[int] = None,
+        cursor: Optional[str] = None,
         ticker: Optional[str] = None,
     ) -> PaginatedResponseHistoryDividendItem:
-        params: dict[str, Any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": _validate_limit(limit)}
         if cursor is not None:
             params["cursor"] = cursor
         if ticker:
@@ -120,10 +160,10 @@ class Trading212Client:
     def get_historical_orders(
         self,
         limit: int = 20,
-        cursor: Optional[int | str] = None,
+        cursor: Optional[str] = None,
         ticker: Optional[str] = None,
     ) -> PaginatedResponseHistoricalOrder:
-        params: dict[str, Any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": _validate_limit(limit)}
         if cursor is not None:
             params["cursor"] = cursor
         if ticker:
@@ -135,7 +175,7 @@ class Trading212Client:
     def get_historical_transactions(
         self, limit: int = 20, cursor: Optional[str] = None, time: Optional[str] = None
     ) -> PaginatedResponseHistoryTransactionItem:
-        params: dict[str, Any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": _validate_limit(limit)}
         if cursor:
             params["cursor"] = cursor
         if time:
@@ -143,6 +183,128 @@ class Trading212Client:
         return PaginatedResponseHistoryTransactionItem(
             **self._get("/equity/history/transactions", params).json()
         )
+
+    # 2b. Auto-pagination generators following nextPagePath until exhausted.
+    def iter_all_orders(
+        self,
+        *,
+        limit: int = _HISTORY_LIMIT_MAX,
+        ticker: Optional[str] = None,
+    ) -> Iterator[HistoricalOrder]:
+        """Yield every historical order, transparently following ``nextPagePath``.
+
+        Implements the cursor-paginated workflow described in the spec so
+        callers do not have to. Raises ``RuntimeError`` if the API returns more
+        than ``_MAX_PAGINATION_PAGES`` pages (safety net for misbehaviour).
+        """
+        cursor: Optional[str] = None
+        pages = 0
+        while True:
+            pages += 1
+            if pages > _MAX_PAGINATION_PAGES:
+                raise RuntimeError(
+                    f"iter_all_orders exceeded {_MAX_PAGINATION_PAGES} pages; aborting"
+                )
+            page = self.get_historical_orders(limit=limit, cursor=cursor, ticker=ticker)
+            if page.items:
+                yield from page.items
+            if not page.nextPagePath:
+                return
+            cursor = _cursor_from_next_page_path(page.nextPagePath)
+            if cursor is None:
+                return
+
+    def iter_all_dividends(
+        self,
+        *,
+        limit: int = _HISTORY_LIMIT_MAX,
+        ticker: Optional[str] = None,
+    ) -> Iterator[HistoryDividendItem]:
+        """Yield every historical dividend, transparently following ``nextPagePath``."""
+        cursor: Optional[str] = None
+        pages = 0
+        while True:
+            pages += 1
+            if pages > _MAX_PAGINATION_PAGES:
+                raise RuntimeError(
+                    f"iter_all_dividends exceeded {_MAX_PAGINATION_PAGES} pages; aborting"
+                )
+            page = self.get_historical_dividends(
+                limit=limit, cursor=cursor, ticker=ticker
+            )
+            if page.items:
+                yield from page.items
+            if not page.nextPagePath:
+                return
+            cursor = _cursor_from_next_page_path(page.nextPagePath)
+            if cursor is None:
+                return
+
+    def iter_all_transactions(
+        self,
+        *,
+        limit: int = _HISTORY_LIMIT_MAX,
+        time: Optional[str] = None,
+    ) -> Iterator[HistoryTransactionItem]:
+        """Yield every transaction, transparently following ``nextPagePath``."""
+        cursor: Optional[str] = None
+        pages = 0
+        while True:
+            pages += 1
+            if pages > _MAX_PAGINATION_PAGES:
+                raise RuntimeError(
+                    f"iter_all_transactions exceeded {_MAX_PAGINATION_PAGES} pages; aborting"
+                )
+            page = self.get_historical_transactions(
+                limit=limit, cursor=cursor, time=time
+            )
+            if page.items:
+                yield from page.items
+            if not page.nextPagePath:
+                return
+            cursor = _cursor_from_next_page_path(page.nextPagePath)
+            if cursor is None:
+                return
+
+    # 2c. Report polling helper implementing the async workflow.
+    def wait_for_report(
+        self,
+        report_id: int,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> ReportResponse:
+        """Poll ``GET /equity/history/exports`` until ``report_id`` reaches a terminal state.
+
+        Implements the asynchronous report workflow documented in the spec:
+        ``POST /history/exports`` returns a ``reportId``, then the caller polls
+        ``GET /history/exports`` until ``status == "Finished"`` (at which point
+        ``downloadLink`` is populated). Other terminal statuses
+        (``Canceled``, ``Failed``) raise ``RuntimeError``. Raises
+        ``TimeoutError`` if no terminal state is reached within ``timeout``
+        seconds.
+        """
+        deadline = time.monotonic() + timeout
+        while True:
+            reports = self.get_historical_exports()
+            match = next((r for r in reports if r.reportId == report_id), None)
+            if match is None:
+                raise RuntimeError(
+                    f"reportId {report_id} not found in GET /equity/history/exports"
+                )
+            status = match.status
+            if status and status.value in {"Finished"}:
+                return match
+            if status and status.value in {"Canceled", "Failed"}:
+                raise RuntimeError(
+                    f"reportId {report_id} terminated with status {status.value}"
+                )
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"reportId {report_id} not finished within {timeout:g}s"
+                    f" (last status: {status.value if status else None})"
+                )
+            time.sleep(poll_interval)
 
     # 3. Metadata (Instruments)
     def get_exchanges(self) -> List[Exchange]:

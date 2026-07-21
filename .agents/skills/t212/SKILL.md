@@ -10,14 +10,15 @@ compatibility: Requires Python 3.14+, uv, and Trading 212 API credentials
   (T212_API_KEY_ID, T212_SECRET_KEY).
 metadata:
   author: timoh
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 ## When to use
 
 - **Portfolio check**: "What's my account balance?", "Show my portfolio"
 - **Positions**: "List my open positions", "What am I holding?"
-- **Orders**: "Place a market buy for 10 shares of AAPL", "Cancel order 12345" (Limit and stop orders are supported by the API but not exposed in the CLI)
+- **Orders**: "Place a market buy for 10 shares of AAPL", "Cancel order 12345",
+  "Place a limit order", "Set a stop-loss", "Place a stop-limit order"
 - **History**: "Show my transactions", "What dividends did I receive?"
 - **Tax reporting**: "Generate German tax report for 2024"
 - **Pies**: "List my pies", "Create a new pie", "Analyze pie holdings"
@@ -63,6 +64,16 @@ uv run t212 orders market --ticker AAPL_US_EQ --quantity 10
 
 # Place a market order with extended hours
 uv run t212 orders market --ticker AAPL_US_EQ --quantity 10 --extended-hours
+
+# Place a limit order (fills at limitPrice or better; --time-validity DAY|GOOD_TILL_CANCEL)
+uv run t212 orders limit --ticker AAPL_US_EQ --quantity 10 --limit-price 180.50
+uv run t212 orders limit --ticker AAPL_US_EQ --quantity -10 --limit-price 200 --time-validity GOOD_TILL_CANCEL
+
+# Place a stop order (triggers a market order when stopPrice is hit; negative qty = stop-loss)
+uv run t212 orders stop --ticker AAPL_US_EQ --quantity -10 --stop-price 170
+
+# Place a stop-limit order (when stopPrice hit, places a limit order at limitPrice)
+uv run t212 orders stop-limit --ticker AAPL_US_EQ --quantity -10 --stop-price 170 --limit-price 169.50
 ```
 
 ### History
@@ -77,6 +88,26 @@ uv run t212 history orders --limit 50
 
 # View transactions
 uv run t212 history transactions --limit 50
+```
+
+### History exports (CSV reports)
+
+Report generation is **asynchronous**: `request` enqueues a report and returns
+a `reportId`; poll `list` until `status == Finished`, then read `downloadLink`.
+
+```bash
+# List all generated reports and their status
+uv run t212 history exports list
+
+# Request a CSV report for a date range (ISO 8601)
+uv run t212 history exports request 2024-01-01T00:00:00Z 2024-12-31T23:59:59Z
+
+# Request with --wait: blocks until Finished (or timeout), then prints downloadLink
+uv run t212 history exports request 2024-01-01T00:00:00Z 2024-12-31T23:59:59Z --wait
+
+# Exclude sections (orders/dividends/transactions included by default, interest excluded)
+uv run t212 history exports request 2024-01-01T00:00:00Z 2024-12-31T23:59:59Z \
+    --no-dividends --include-interest
 ```
 
 ### Metadata
@@ -239,11 +270,67 @@ purchases"), the agent should:
 | Dividends, historical orders, transactions | 6 req / 1m |
 | History exports | 1 req / 1m |
 | Request export | 1 req / 30s |
+| List pies | 1 req / 30s |
+| Pie create / get / update / delete / duplicate | 1 req / 5s |
+
+## Wallet impact schemas
+
+Every `Position` and historical `Fill` carries a `walletImpact` object that
+consolidates P/L, FX impact, and taxes. Prefer these fields over any legacy
+top-level `ppl` / `fxPpl` (which were removed when the wallet-impact schemas
+were introduced).
+
+### `PositionWalletImpact` — `Position.walletImpact`
+
+| Field | Description |
+|-------|-------------|
+| `currency` | Currency code for all values in this object |
+| `currentValue` | Current market value of the position |
+| `fxImpact` | P/L impact due to currency rate changes |
+| `totalCost` | Total cost paid for the position |
+| `unrealizedProfitLoss` | `currentValue − totalCost` |
+
+### `FillWalletImpact` — `Fill.walletImpact`
+
+| Field | Description |
+|-------|-------------|
+| `currency` | Currency code for all values in this object |
+| `fxRate` | FX rate applied to this fill |
+| `netValue` | Net value of the fill in account currency |
+| `realisedProfitLoss` | Realized P/L for this fill |
+| `taxes` | Array of `Tax` objects (see below) |
+
+### `Tax` — items in `FillWalletImpact.taxes`
+
+| Field | Description |
+|-------|-------------|
+| `chargedAt` | When the tax was charged |
+| `currency` | Tax currency code |
+| `name` | Enum: `COMMISSION_TURNOVER`, `CURRENCY_CONVERSION_FEE`, `FINRA_FEE`, `FRENCH_TRANSACTION_TAX`, `PTM_LEVY`, `STAMP_DUTY`, `STAMP_DUTY_RESERVE_TAX`, `TRANSACTION_FEE` |
+| `quantity` | Tax amount |
+
+The tax/FIFO engine in `tax/calculator.py` reads `fill.walletImpact.taxes` and
+`fill.walletImpact.fxRate` to compute German cost basis.
+
+## Order initiation sources
+
+`Order.initiatedFrom` indicates how an order was placed:
+
+| Value | Meaning |
+|-------|---------|
+| `API` | Placed via this Public API |
+| `IOS` / `ANDROID` / `WEB` | Placed from a Trading 212 app |
+| `SYSTEM` | System-initiated |
+| `AUTOINVEST` | Pie auto-invest rule |
+| `INSTRUMENT_AUTOINVEST` | Instrument-level auto-invest rule |
 
 ## Gotchas
 
 1. **Sell orders use negative quantity**: To sell, pass a negative value
-   (e.g., `--quantity -10.5`). Positive = buy, negative = sell.
+   (e.g., `--quantity -10.5`). Positive = buy, negative = sell. For CLI
+   positional args (orders limit/stop/stop-limit), use `--` to separate
+   flags from the negative number, e.g.
+   `t212 orders stop -- AAPL -10 170`.
 2. **Orders execute in primary account currency only**: Multi-currency not
    supported via the API.
 3. **Pies API is deprecated**: Still functional but will not receive updates.
@@ -251,7 +338,12 @@ purchases"), the agent should:
    price, especially for illiquid instruments.
 5. **Rate limits are per-account**, not per-key or per-IP.
 6. **Historical data pagination**: Uses cursor-based pagination via
-   `nextPagePath`. The CLI handles this automatically in tax reporting.
+   `nextPagePath` (`limit` default 20, max 50). The client provides
+   `iter_all_orders()`, `iter_all_dividends()`, `iter_all_transactions()`
+   generators that follow `nextPagePath` automatically — the CLI's `tax
+   fifo-report` uses this. The bare `history orders|dividends|transactions`
+   commands fetch a single page; pass `--cursor` from the previous response's
+   `nextPagePath` to page manually.
 7. **No idempotency**: The beta API does not guarantee idempotent order
    placement — duplicate requests may create duplicate orders.
 8. **Instrument resolution cache**: `resolve_ticker_from_isin()` and

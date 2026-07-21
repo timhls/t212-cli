@@ -1,7 +1,6 @@
 import typer
 import os
 import datetime
-import urllib.parse
 from rich.console import Console
 from rich.table import Table
 from t212_cli.tax.config import (
@@ -81,42 +80,10 @@ def generate_fifo_report(year: int = 2024) -> None:
         "[dim]- Loading historical transactions from Trading 212 API...[/dim]"
     )
 
-    # Fetch all historical orders using pagination
-    all_orders: list[HistoricalOrder] = []
-    cursor: int | str | None = None
+    # Fetch all historical orders using auto-pagination helper.
+    # The spec's cursor-based nextPagePath workflow is handled inside the client.
     with console.status("[dim]Fetching orders...[/dim]"):
-        while True:
-            res = client.get_historical_orders(limit=50, cursor=cursor)
-            if res.items:
-                all_orders.extend(res.items)
-
-            if not res.nextPagePath:
-                break
-
-            # next page path usually has cursor as a query param.
-            # The API might just return the cursor string, let's parse it or assume cursor is just pagination offset
-            # T212 API returns a string like "/api/v0/equity/history/orders?cursor=xxxx"
-            # Let's extract the cursor from nextPagePath
-            try:
-                parsed_url = urllib.parse.urlparse(res.nextPagePath)
-                query_params = urllib.parse.parse_qs(parsed_url.query)
-                cursor_str = query_params.get("cursor", [None])[0]
-                if not cursor_str:
-                    break
-                # Handle both string and numeric cursors per API spec (cursor: string | number)
-                try:
-                    cursor = int(cursor_str)
-                except ValueError:
-                    # If not numeric, pass the raw string cursor
-                    cursor = cursor_str
-            except Exception:
-                # Log the error for visibility instead of silent break
-                import logging
-
-                logging.warning(
-                    f"Pagination failed at cursor, stopping: {res.nextPagePath}"
-                )
-                break
+        all_orders = list(client.iter_all_orders())
 
     console.print(f"[green]Loaded {len(all_orders)} historical orders.[/green]")
 

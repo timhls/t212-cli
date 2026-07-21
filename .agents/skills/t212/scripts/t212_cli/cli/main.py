@@ -1,10 +1,21 @@
 from typing import Any, Optional
+from datetime import datetime
 import typer
 import os
 import json
 from rich.console import Console
 from t212_cli.client.base import Trading212Client
-from t212_cli.models import MarketRequest, PieRequest, DuplicateBucketRequest
+from t212_cli.models import (
+    MarketRequest,
+    LimitRequest,
+    StopRequest,
+    StopLimitRequest,
+    TimeValidity,
+    PublicReportRequest,
+    ReportDataIncluded,
+    PieRequest,
+    DuplicateBucketRequest,
+)
 from t212_cli.cli.tax import app as tax_app
 from t212_cli.tax.charts import (
     SummaryRow,
@@ -89,7 +100,7 @@ def positions_list(ticker: str = typer.Option(None, help="Filter by ticker")) ->
 # === HISTORY ===
 @history_app.command("dividends")
 def history_dividends(
-    limit: int = 20, cursor: Optional[int] = None, ticker: Optional[str] = None
+    limit: int = 20, cursor: Optional[str] = None, ticker: Optional[str] = None
 ) -> None:
     """Get historical dividends."""
     client = get_client()
@@ -102,7 +113,7 @@ def history_dividends(
 
 @history_app.command("orders")
 def history_orders(
-    limit: int = 20, cursor: Optional[int] = None, ticker: Optional[str] = None
+    limit: int = 20, cursor: Optional[str] = None, ticker: Optional[str] = None
 ) -> None:
     """Get historical orders."""
     client = get_client()
@@ -122,6 +133,62 @@ def history_transactions(
     try:
         res = client.get_historical_transactions(limit, cursor, time)
         pretty_print(res)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+history_exports_app = typer.Typer(help="Manage asynchronous CSV reports")
+history_app.add_typer(history_exports_app, name="exports")
+
+
+@history_exports_app.command("list")
+def history_exports_list() -> None:
+    """List all generated reports and their status."""
+    client = get_client()
+    try:
+        pretty_print(client.get_historical_exports())
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@history_exports_app.command("request")
+def history_exports_request(
+    time_from: str,
+    time_to: str,
+    include_orders: bool = True,
+    include_dividends: bool = True,
+    include_transactions: bool = True,
+    include_interest: bool = False,
+    wait: bool = False,
+    poll_timeout: float = 300.0,
+) -> None:
+    """Request a CSV report (asynchronous). Pass --wait to block until Finished."""
+    client = get_client()
+    try:
+        req = PublicReportRequest(
+            timeFrom=datetime.fromisoformat(time_from),
+            timeTo=datetime.fromisoformat(time_to),
+            dataIncluded=ReportDataIncluded(
+                includeOrders=include_orders,
+                includeDividends=include_dividends,
+                includeTransactions=include_transactions,
+                includeInterest=include_interest,
+            ),
+        )
+        enqueued = client.request_historical_export(req)
+        console.print(f"[green]Report enqueued: reportId={enqueued.reportId}[/green]")
+        if wait:
+            console.print(
+                f"[dim]Polling until Finished (timeout {poll_timeout:g}s)...[/dim]"
+            )
+            finished = client.wait_for_report(
+                enqueued.reportId or 0, timeout=poll_timeout
+            )
+            pretty_print(finished)
+            if finished.downloadLink:
+                console.print(
+                    f"[bold green]Download:[/bold green] {finished.downloadLink}"
+                )
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -181,13 +248,81 @@ def orders_cancel(order_id: int) -> None:
 
 @orders_app.command("market")
 def orders_market(ticker: str, quantity: float, extended_hours: bool = False) -> None:
-    """Place a market order."""
+    """Place a market order (positive quantity = buy, negative = sell)."""
     client = get_client()
     try:
         req = MarketRequest(
             ticker=ticker, quantity=quantity, extendedHours=extended_hours
         )
         res = client.place_market_order(req)
+        pretty_print(res)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@orders_app.command("limit")
+def orders_limit(
+    ticker: str,
+    quantity: float,
+    limit_price: float,
+    time_validity: TimeValidity = TimeValidity.DAY,
+) -> None:
+    """Place a limit order (positive quantity = buy, negative = sell)."""
+    client = get_client()
+    try:
+        req = LimitRequest(
+            ticker=ticker,
+            quantity=quantity,
+            limitPrice=limit_price,
+            timeValidity=time_validity,
+        )
+        res = client.place_limit_order(req)
+        pretty_print(res)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@orders_app.command("stop")
+def orders_stop(
+    ticker: str,
+    quantity: float,
+    stop_price: float,
+    time_validity: TimeValidity = TimeValidity.DAY,
+) -> None:
+    """Place a stop order (positive quantity = buy, negative = sell / stop-loss)."""
+    client = get_client()
+    try:
+        req = StopRequest(
+            ticker=ticker,
+            quantity=quantity,
+            stopPrice=stop_price,
+            timeValidity=time_validity,
+        )
+        res = client.place_stop_order(req)
+        pretty_print(res)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@orders_app.command("stop-limit")
+def orders_stop_limit(
+    ticker: str,
+    quantity: float,
+    stop_price: float,
+    limit_price: float,
+    time_validity: TimeValidity = TimeValidity.DAY,
+) -> None:
+    """Place a stop-limit order (positive quantity = buy, negative = sell)."""
+    client = get_client()
+    try:
+        req = StopLimitRequest(
+            ticker=ticker,
+            quantity=quantity,
+            stopPrice=stop_price,
+            limitPrice=limit_price,
+            timeValidity=time_validity,
+        )
+        res = client.place_stop_limit_order(req)
         pretty_print(res)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

@@ -87,9 +87,9 @@ CREDENTIALS=$(echo -n "<YOUR_API_KEY>:<YOUR_API_SECRET>" | base64)
 
 
 # Step 2: Make the API call to the live environment using the encoded
-credentials.
+# credentials.
 
-curl -X GET "https://live.trading212.com/api/v0/equity/account/cash" \
+curl -X GET "https://live.trading212.com/api/v0/equity/account/summary" \
  -H "Authorization: Basic $CREDENTIALS"
 ```
 
@@ -128,35 +128,22 @@ echo -n "<YOUR_API_KEY>:<YOUR_API_SECRET>" | base64
 This simple snippet shows how to generate the full header value.
 
 ```python
-
 import base64
 
-
 # 1. Your credentials
-
 api_key = "<YOUR_API_KEY>"
-
 api_secret = "<YOUR_API_SECRET>"
 
-
 # 2. Combine them into a single string
-
 credentials_string = f"{api_key}:{api_secret}"
 
-
 # 3. Encode the string to bytes, then Base64 encode it
-
-encoded_credentials =
-base64.b64encode(credentials_string.encode('utf-8')).decode('utf-8')
-
+encoded_credentials = base64.b64encode(credentials_string.encode("utf-8")).decode("utf-8")
 
 # 4. The final header value
-
 auth_header = f"Basic {encoded_credentials}"
 
-
 print(auth_header)
-
 ```
 
 ---
@@ -281,6 +268,94 @@ Response 3: nextPagePath is null, indicating the end
   "nextPagePath": null
 }
 ```
+
+---
+
+# Schemas
+
+Key response and request schemas. Field types are as emitted by the API; all
+fields are nullable in the Pydantic models generated for this skill. See
+`assets/api.yaml` for the authoritative, complete schema reference.
+
+## Wallet impact (new)
+
+Every `Position` and every historical `Fill` carries a `walletImpact` object
+that consolidates the financial effect on your account. This is the canonical
+source of P/L, FX impact, and taxes — prefer these fields over legacy
+top-level `ppl` / `fxPpl` (which were removed when the wallet-impact schemas
+were introduced).
+
+### `PositionWalletImpact` — on `Position.walletImpact`
+
+| Field | Type | Description |
+|---|---|---|
+| `currency` | string | Currency code used for all values in this object. |
+| `currentValue` | number | Current market value of the position. |
+| `fxImpact` | number | Positive or negative impact on the position's value due to currency rate changes. |
+| `totalCost` | number | Total cost paid for the position. |
+| `unrealizedProfitLoss` | number | Unrealized P/L. Calculated as `currentValue − totalCost`. |
+
+### `FillWalletImpact` — on `Fill.walletImpact`
+
+| Field | Type | Description |
+|---|---|---|
+| `currency` | string | Currency code used for all values in this object. |
+| `fxRate` | number | FX rate applied to this fill. |
+| `netValue` | number | Net value of the fill in the account currency. |
+| `realisedProfitLoss` | number | Realized P/L for this fill. |
+| `taxes` | array of `Tax` | Per-fill tax breakdown (see below). |
+
+### `Tax` — items in `FillWalletImpact.taxes`
+
+| Field | Type | Description |
+|---|---|---|
+| `chargedAt` | date-time | When the tax was charged. |
+| `currency` | string | Tax currency code. |
+| `name` | enum | One of: `COMMISSION_TURNOVER`, `CURRENCY_CONVERSION_FEE`, `FINRA_FEE`, `FRENCH_TRANSACTION_TAX`, `PTM_LEVY`, `STAMP_DUTY`, `STAMP_DUTY_RESERVE_TAX`, `TRANSACTION_FEE`. |
+| `quantity` | number | Tax amount. |
+
+## Reports workflow
+
+CSV report generation is **asynchronous**:
+
+1. `POST /api/v0/equity/history/exports` with a `PublicReportRequest`
+   (`timeFrom`, `timeTo`, `dataIncluded` flags) → returns `EnqueuedReportResponse`
+   with just `{ reportId }`.
+2. Poll `GET /api/v0/equity/history/exports` (returns an array of
+   `ReportResponse`) until the entry with your `reportId` has
+   `status == "Finished"`.
+3. When finished, the `downloadLink` field holds a URL to download the CSV.
+   Other terminal statuses: `Canceled`, `Failed`.
+
+The `ReportResponse.status` enum uses PascalCase (unlike most other enums in
+this API): `Queued`, `Processing`, `Running`, `Canceled`, `Failed`, `Finished`.
+
+## Order sign convention
+
+The `quantity` field determines trade direction **everywhere** an order is
+placed or filled:
+
+* **Positive quantity** → **BUY**
+* **Negative quantity** → **SELL** (e.g. `-10.5` sells 10.5 shares)
+
+This applies to `MarketRequest.quantity`, `LimitRequest.quantity`,
+`StopRequest.quantity`, `StopLimitRequest.quantity`, and the `quantity`
+recorded on each `Fill`. The `Order.side` enum (`BUY`/`SELL`) is informational
+and is derived from the sign.
+
+## Order initiation sources
+
+`Order.initiatedFrom` enum:
+
+| Value | Meaning |
+|---|---|
+| `API` | Placed via this Public API. |
+| `IOS` | Placed from the iOS app. |
+| `ANDROID` | Placed from the Android app. |
+| `WEB` | Placed from the web app. |
+| `SYSTEM` | System-initiated. |
+| `AUTOINVEST` | Initiated by a Pie auto-invest rule. |
+| `INSTRUMENT_AUTOINVEST` | Initiated by an instrument-level auto-invest rule. |
 
 ---
 
