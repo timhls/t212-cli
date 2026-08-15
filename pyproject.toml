@@ -1,6 +1,6 @@
 [project]
 name = "t212-cli"
-version = "1.4.1"
+version = "1.4.2"
 description = "A Python client and CLI for the Trading 212 API"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -63,7 +63,7 @@ upload_to_vcs_release = true
 dev = [
     "pytest==9.1.1",
     "pytest-mock==3.15.1",
-    "ruff==0.16.2",
+    "ruff==0.16.3",
     "mypy==2.3.0",
     "python-semantic-release==10.6.1",
     "types-requests==2.33.0.20260712",
