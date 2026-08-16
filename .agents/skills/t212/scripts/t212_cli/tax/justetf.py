@@ -99,7 +99,7 @@ def _extract_basics(soup: BeautifulSoup) -> dict[str, Any]:
     }
 
     for slug, field in slug_to_field.items():
-        cell = soup.find(attrs={"data-testid": f"tl_etf-basics_value_{slug}"})
+        cell = soup.find(attrs={"data-testid": f"tl_etf-basics_value_{slug}"})  # type: ignore[call-overload]
         if not cell:
             continue
         raw = cell.get_text(strip=True)
@@ -120,7 +120,7 @@ def _extract_basics(soup: BeautifulSoup) -> dict[str, Any]:
     # Structure: <tr data-testid="etf-basics_row_fund-size">
     #              <td class="vallabel">Fund size</td>
     #              <td>EUR 19,830 m <span .../></td>
-    fs_row = soup.find(attrs={"data-testid": "etf-basics_row_fund-size"})
+    fs_row = soup.find(attrs={"data-testid": "etf-basics_row_fund-size"})  # type: ignore[call-overload]
     if fs_row:
         tds = fs_row.find_all("td", recursive=False) or fs_row.find_all("td")
         if len(tds) >= 2:

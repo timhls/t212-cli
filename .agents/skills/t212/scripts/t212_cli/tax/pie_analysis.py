@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import AccountBucketInstrumentsDetailedResponse
-from t212_cli.tax.justetf import scrape_justetf, enrich_profile_with_yahoo
+from t212_cli.tax.justetf import enrich_profile_with_yahoo, scrape_justetf
 from t212_cli.tax.models import EtfProfile
 
 

@@ -1,7 +1,9 @@
-import yaml
 from pathlib import Path
+
+import yaml
 from pydantic import ValidationError
 from rich.console import Console
+
 from t212_cli.tax.models import TaxConfig, TaxInstrument
 
 CONFIG_DIR = Path.home() / ".t212"

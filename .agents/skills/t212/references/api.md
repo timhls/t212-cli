@@ -138,7 +138,9 @@ api_secret = "<YOUR_API_SECRET>"
 credentials_string = f"{api_key}:{api_secret}"
 
 # 3. Encode the string to bytes, then Base64 encode it
-encoded_credentials = base64.b64encode(credentials_string.encode("utf-8")).decode("utf-8")
+encoded_credentials = base64.b64encode(credentials_string.encode("utf-8")).decode(
+    "utf-8"
+)
 
 # 4. The final header value
 auth_header = f"Basic {encoded_credentials}"

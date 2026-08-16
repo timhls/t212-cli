@@ -1,7 +1,8 @@
 from datetime import date
-from t212_cli.tax.market_data import get_historical_price
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
+from t212_cli.tax.market_data import get_historical_price
 
 
 @patch("t212_cli.tax.yahoo_finance.get_ticker")

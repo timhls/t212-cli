@@ -1,17 +1,18 @@
-import typer
-import os
 import datetime
+import os
+
+import typer
 from rich.console import Console
 from rich.table import Table
+from t212_cli.client.base import Trading212Client
+from t212_cli.models import HistoricalOrder, Side
+from t212_cli.tax.calculator import FifoEngine, TaxEvent
 from t212_cli.tax.config import (
     get_instrument_config,
-    update_instrument_config,
     load_tax_config,
+    update_instrument_config,
 )
 from t212_cli.tax.scraper import scrape_finanzfluss
-from t212_cli.client.base import Trading212Client
-from t212_cli.tax.calculator import FifoEngine, TaxEvent
-from t212_cli.models import Side, HistoricalOrder
 
 app = typer.Typer(help="German Tax Reporting Commands (FiFo, TFS, Vorabpauschale)")
 console = Console()

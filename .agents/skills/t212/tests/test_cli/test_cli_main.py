@@ -1,9 +1,10 @@
-from typing import Any, Generator
 import os
+from typing import Any, Generator
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from typer.testing import CliRunner
 from t212_cli.cli.main import app
+from typer.testing import CliRunner
 
 runner = CliRunner()
 

@@ -1,32 +1,33 @@
-import httpx
 import base64
 import os
 import time
 import urllib.parse
-from typing import Any, Iterator, Optional, List
+from typing import Any, Iterator, List, Optional
+
+import httpx
 from t212_cli.models import (
-    AccountSummary,
-    PaginatedResponseHistoryDividendItem,
-    ReportResponse,
-    PublicReportRequest,
-    EnqueuedReportResponse,
-    PaginatedResponseHistoricalOrder,
-    PaginatedResponseHistoryTransactionItem,
-    Exchange,
-    TradableInstrument,
-    Order,
-    LimitRequest,
-    MarketRequest,
-    StopRequest,
-    StopLimitRequest,
-    AccountBucketResultResponse,
     AccountBucketInstrumentsDetailedResponse,
-    PieRequest,
+    AccountBucketResultResponse,
+    AccountSummary,
     DuplicateBucketRequest,
-    Position,
+    EnqueuedReportResponse,
+    Exchange,
     HistoricalOrder,
     HistoryDividendItem,
     HistoryTransactionItem,
+    LimitRequest,
+    MarketRequest,
+    Order,
+    PaginatedResponseHistoricalOrder,
+    PaginatedResponseHistoryDividendItem,
+    PaginatedResponseHistoryTransactionItem,
+    PieRequest,
+    Position,
+    PublicReportRequest,
+    ReportResponse,
+    StopLimitRequest,
+    StopRequest,
+    TradableInstrument,
 )
 
 # Per spec: "Max items: 50" on /history/orders, /history/dividends, /history/transactions

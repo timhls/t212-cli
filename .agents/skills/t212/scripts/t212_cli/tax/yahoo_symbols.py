@@ -90,7 +90,7 @@ def search_yahoo_symbol(
         resp = sess.get(url, params=params, timeout=15)
         if resp.status_code != 200:
             return None
-        data: dict[str, Any] = resp.json()
+        data: dict[str, Any] = resp.json()  # type: ignore[no-untyped-call]
     except Exception:
         return None
 

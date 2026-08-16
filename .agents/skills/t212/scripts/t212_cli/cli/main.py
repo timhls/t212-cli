@@ -1,22 +1,23 @@
-from typing import Any, Optional
-from datetime import datetime
-import typer
-import os
 import json
+import os
+from datetime import datetime
+from typing import Any, Optional
+
+import typer
 from rich.console import Console
+from t212_cli.cli.tax import app as tax_app
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import (
-    MarketRequest,
+    DuplicateBucketRequest,
     LimitRequest,
-    StopRequest,
-    StopLimitRequest,
-    TimeValidity,
+    MarketRequest,
+    PieRequest,
     PublicReportRequest,
     ReportDataIncluded,
-    PieRequest,
-    DuplicateBucketRequest,
+    StopLimitRequest,
+    StopRequest,
+    TimeValidity,
 )
-from t212_cli.cli.tax import app as tax_app
 from t212_cli.tax.charts import (
     SummaryRow,
     fmt_date_range,
@@ -24,7 +25,7 @@ from t212_cli.tax.charts import (
     render_summary_table,
 )
 from t212_cli.tax.history import fetch_pie_history, summary_stats
-from t212_cli.tax.justetf import scrape_justetf, enrich_profile_with_yahoo
+from t212_cli.tax.justetf import enrich_profile_with_yahoo, scrape_justetf
 from t212_cli.tax.pie_analysis import analyze_pie
 
 app = typer.Typer(help="Trading 212 CLI")

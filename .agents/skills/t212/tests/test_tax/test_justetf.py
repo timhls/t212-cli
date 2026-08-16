@@ -1,7 +1,7 @@
-from t212_cli.tax.justetf import scrape_justetf
-from t212_cli.tax.models import EtfProfile, EtfHolding
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+from t212_cli.tax.justetf import scrape_justetf
+from t212_cli.tax.models import EtfHolding, EtfProfile
 
 JUSTETF_HTML = """
 <html><body>

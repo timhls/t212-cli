@@ -1,7 +1,8 @@
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 from t212_cli.tax.calculator import FifoEngine, TaxEvent
 from t212_cli.tax.models import AssetClass, TaxInstrument
-from unittest.mock import patch, MagicMock
 
 
 def test_fifo_engine_buy() -> None:

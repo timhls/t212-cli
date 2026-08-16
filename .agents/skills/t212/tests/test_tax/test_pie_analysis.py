@@ -1,9 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-
-from t212_cli.tax.models import EtfProfile, EtfHolding
+from t212_cli.tax.models import EtfHolding, EtfProfile
 from t212_cli.tax.pie_analysis import analyze_pie
-
 
 SAMPLE_PROFILE_1 = EtfProfile(
     isin="IE00BJ0KDQ92",

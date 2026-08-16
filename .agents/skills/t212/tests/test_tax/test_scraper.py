@@ -1,6 +1,7 @@
-from t212_cli.tax.scraper import scrape_finanzfluss
+from unittest.mock import MagicMock, patch
+
 from t212_cli.tax.models import AssetClass
-from unittest.mock import patch, MagicMock
+from t212_cli.tax.scraper import scrape_finanzfluss
 
 
 @patch("t212_cli.tax.scraper.requests.get")

@@ -44,6 +44,9 @@ testpaths = [".agents/skills/t212/tests"]
 line-length = 88
 target-version = "py314"
 
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
 [tool.mypy]
 strict = true
 python_version = "3.14"

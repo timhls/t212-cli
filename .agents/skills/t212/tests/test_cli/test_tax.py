@@ -2,8 +2,6 @@ import datetime
 import os
 from unittest.mock import MagicMock, patch
 
-from typer.testing import CliRunner
-
 from t212_cli.cli.main import app
 from t212_cli.models import (
     Fill,
@@ -19,7 +17,7 @@ from t212_cli.models import (
     Type3,
 )
 from t212_cli.tax.models import AssetClass, TaxConfig, TaxInstrument
-
+from typer.testing import CliRunner
 
 runner = CliRunner()
 
