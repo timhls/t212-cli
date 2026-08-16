@@ -1,11 +1,12 @@
+from unittest.mock import MagicMock, mock_open, patch
+
 from t212_cli.tax.config import (
+    get_instrument_config,
     load_tax_config,
     save_tax_config,
-    get_instrument_config,
     update_instrument_config,
 )
-from t212_cli.tax.models import TaxConfig, TaxInstrument, AssetClass
-from unittest.mock import mock_open, patch, MagicMock
+from t212_cli.tax.models import AssetClass, TaxConfig, TaxInstrument
 
 
 @patch("pathlib.Path.exists", return_value=False)

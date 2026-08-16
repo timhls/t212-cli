@@ -1,21 +1,22 @@
-from datetime import datetime, timezone
 import base64
 import os
 import time
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 from t212_cli.client.base import Trading212Client
-
-from t212_cli.models import ReportDataIncluded, TimeValidity, DividendCashAction
 from t212_cli.models import (
+    DividendCashAction,
+    DuplicateBucketRequest,
     LimitRequest,
     MarketRequest,
-    StopRequest,
-    StopLimitRequest,
-    PublicReportRequest,
     PieRequest,
-    DuplicateBucketRequest,
+    PublicReportRequest,
+    ReportDataIncluded,
+    StopLimitRequest,
+    StopRequest,
+    TimeValidity,
 )
 
 
@@ -837,8 +838,8 @@ def test_rate_limit_wait_seconds_falls_back_to_retry_after() -> None:
 def test_rate_limit_wait_seconds_defaults_on_no_headers() -> None:
     """Uses exponential backoff default when neither header is present."""
     from t212_cli.client.base import (
-        _rate_limit_wait_seconds,
         _RATE_LIMIT_INITIAL_BACKOFF,
+        _rate_limit_wait_seconds,
     )
 
     resp = MagicMock()

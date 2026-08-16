@@ -1,10 +1,9 @@
 import os
 from unittest.mock import MagicMock, patch
 
-from typer.testing import CliRunner
-
 from t212_cli.cli.main import app
 from t212_cli.client.base import Trading212Client
+from typer.testing import CliRunner
 
 
 def test_client_default_url() -> None:

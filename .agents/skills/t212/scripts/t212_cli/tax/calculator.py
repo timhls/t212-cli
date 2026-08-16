@@ -1,9 +1,11 @@
-from datetime import datetime, date
-from typing import List, Dict, Optional
+from datetime import date, datetime
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel
-from t212_cli.tax.models import AssetClass
+
 from t212_cli.tax.config import get_instrument_config
 from t212_cli.tax.market_data import get_historical_price
+from t212_cli.tax.models import AssetClass
 
 
 class Tranche(BaseModel):

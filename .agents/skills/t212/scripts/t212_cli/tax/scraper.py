@@ -1,8 +1,10 @@
 import re
-from curl_cffi import requests
-from bs4 import BeautifulSoup
 from typing import Optional
-from t212_cli.tax.models import TaxInstrument, AssetClass
+
+from bs4 import BeautifulSoup
+from curl_cffi import requests
+
+from t212_cli.tax.models import AssetClass, TaxInstrument
 
 
 def scrape_finanzfluss(isin: str) -> Optional[TaxInstrument]:
