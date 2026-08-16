@@ -39,6 +39,10 @@ jobs:
         run: |
           uv sync
 
+      # 3.5 Verify lockfile is consistent with pyproject.toml
+      - name: Check lockfile consistency
+        run: uv lock --check
+
       # 4. Run Ruff (Replaces Sonar's "Code Smells" check)
       - name: Lint with Ruff
         run: |
