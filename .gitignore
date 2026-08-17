@@ -1,5 +1,12 @@
 .idea/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
+# opencode local artifacts
+.opencode/
+
 # Python
 __pycache__/
 *.py[cod]
