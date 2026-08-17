@@ -638,7 +638,7 @@ def test_crypto_fifo_matching(mock_get_config: MagicMock) -> None:
 
 
 @patch("t212_cli.tax.calculator.get_instrument_config")
-@patch("t212_cli.tax.calculator.get_historical_price")
+@patch("t212_cli.tax.calculator.get_historical_price_eur")
 def test_vorabpauschale_document_example(
     mock_get_price: MagicMock,
     mock_get_config: MagicMock,
@@ -673,7 +673,7 @@ def test_vorabpauschale_document_example(
 
 
 @patch("t212_cli.tax.calculator.get_instrument_config")
-@patch("t212_cli.tax.calculator.get_historical_price")
+@patch("t212_cli.tax.calculator.get_historical_price_eur")
 def test_vorabpauschale_midyear_purchase_1_12_rule(
     mock_get_price: MagicMock,
     mock_get_config: MagicMock,
@@ -708,7 +708,7 @@ def test_vorabpauschale_midyear_purchase_1_12_rule(
 
 
 @patch("t212_cli.tax.calculator.get_instrument_config")
-@patch("t212_cli.tax.calculator.get_historical_price")
+@patch("t212_cli.tax.calculator.get_historical_price_eur")
 def test_vorabpauschale_deducted_at_sale_without_tfs(
     mock_get_price: MagicMock,
     mock_get_config: MagicMock,
@@ -754,7 +754,7 @@ def test_vorabpauschale_deducted_at_sale_without_tfs(
 
 
 @patch("t212_cli.tax.calculator.get_instrument_config")
-@patch("t212_cli.tax.calculator.get_historical_price")
+@patch("t212_cli.tax.calculator.get_historical_price_eur")
 def test_vorabpauschale_zero_when_loss(
     mock_get_price: MagicMock,
     mock_get_config: MagicMock,
@@ -871,3 +871,186 @@ def test_dividend_foreign_tax_capped_at_15pct(
         )
     )
     assert engine.anrechenbare_quellensteuer == 150.0  # capped at 15%
+
+
+# === §18 Abs.1 Satz 1: acquisition-price substitution for in-year buys ===
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+@patch("t212_cli.tax.calculator.get_historical_price_eur")
+def test_vorabpauschale_inyear_buy_uses_acquisition_price(
+    mock_get_price: MagicMock,
+    mock_get_config: MagicMock,
+) -> None:
+    """In-year buys measure the Wertsteigerung from the acquisition price,
+    not from the (lower) start-of-year price (§18 Abs.1 Satz 1 InvStG)."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIENFONDS, tfs_quote=0.30
+    )
+    # ETF fell over the year (90 -> 95) but was bought during the year at 100
+    # and fell since: end - acquisition = 95 - 100 = -5 -> Vorabpauschale = 0
+    mock_get_price.side_effect = [90.0, 95.0]
+
+    engine = FifoEngine(target_year=2026)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 6, 1),
+            type="BUY",
+            isin="ETF",
+            quantity=10.0,
+            price_eur=100.0,
+        )
+    )
+    engine.process_year_end(year=2026, basiszins=0.032)
+
+    assert engine.inventory["ETF"][0].accumulated_vorabpauschale == 0.0
+    assert engine.year_taxable_gains == 0.0
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+@patch("t212_cli.tax.calculator.get_historical_price_eur")
+def test_vorabpauschale_inyear_buy_capped_by_gain_since_acquisition(
+    mock_get_price: MagicMock,
+    mock_get_config: MagicMock,
+) -> None:
+    """If the fund rose sharply before the in-year purchase, the
+    Wertsteigerung since acquisition (not since Jan 1) caps the Vorabpauschale."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIENFONDS, tfs_quote=0.0
+    )
+    # Jan 1 = 100, Dec 31 = 160 (full-year gain 60), bought in July at 150
+    mock_get_price.side_effect = [100.0, 160.0]
+
+    engine = FifoEngine(target_year=2026)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 7, 1),
+            type="BUY",
+            isin="ETF",
+            quantity=100.0,
+            price_eur=150.0,
+        )
+    )
+    engine.process_year_end(year=2026, basiszins=0.032)
+
+    # Basisertrag = 150 * 0.032 * 0.7 * 0.5 = 1.68/share
+    # Wertsteigerung since acquisition = 160 - 150 = 10 -> min = 1.68
+    assert abs(engine.inventory["ETF"][0].accumulated_vorabpauschale - 168.0) < 0.01
+
+
+# === §23 for synthetic ETCs ===
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_synthetic_etc_routed_to_sec23(mock_get_config: MagicMock) -> None:
+    """Synthetic commodity ETCs (BFH VIII R 4/15 line of argument) fall
+    under §23 when held <= 1 year."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.SYNTHETIC_ETC, tfs_quote=0.0
+    )
+    engine = FifoEngine(target_year=2026)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 1, 10),
+            type="BUY",
+            isin="GB00ETC",
+            quantity=3.0,
+            price_eur=16.31,
+        )
+    )
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 12, 20),
+            type="SELL",
+            isin="GB00ETC",
+            quantity=3.0,
+            price_eur=14.95,  # 44.84 net proceeds / 3
+            fees_eur=0.0,
+        )
+    )
+
+    assert (
+        abs(engine.year_private_veraeusserungs_gewinne_generated - (44.85 - 48.93))
+        < 0.01
+    )
+    assert engine.year_taxable_gains == 0.0
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_synthetic_etc_over_one_year_tax_free(mock_get_config: MagicMock) -> None:
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.SYNTHETIC_ETC, tfs_quote=0.0
+    )
+    engine = FifoEngine(target_year=2026)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2024, 1, 10),
+            type="BUY",
+            isin="GB00ETC",
+            quantity=1.0,
+            price_eur=100.0,
+        )
+    )
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 6, 20),
+            type="SELL",
+            isin="GB00ETC",
+            quantity=1.0,
+            price_eur=150.0,
+        )
+    )
+
+    assert engine.year_private_veraeusserungs_gewinne_generated == 0.0
+    assert engine.year_taxable_gains == 0.0
+
+
+# === Uncovered sells tracking ===
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_uncovered_sell_recorded(mock_get_config: MagicMock) -> None:
+    """Sells without matching inventory (e.g. missing Transfer-in data)
+    are recorded instead of being silently dropped."""
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIENFONDS, tfs_quote=0.3
+    )
+    engine = FifoEngine(target_year=2026)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 2, 1),
+            type="SELL",
+            isin="IE001",
+            quantity=5.0,
+            price_eur=100.0,
+        )
+    )
+    assert engine.uncovered_sells == {"IE001": 5.0}
+    assert engine.year_taxable_gains == 0.0
+
+
+@patch("t212_cli.tax.calculator.get_instrument_config")
+def test_partially_covered_sell_records_remainder(mock_get_config: MagicMock) -> None:
+    mock_get_config.return_value = TaxInstrument(
+        asset_class=AssetClass.AKTIENFONDS, tfs_quote=0.0
+    )
+    engine = FifoEngine(target_year=2026)
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 1, 1),
+            type="BUY",
+            isin="IE001",
+            quantity=5.0,
+            price_eur=100.0,
+        )
+    )
+    engine.process_event(
+        TaxEvent(
+            date=datetime(2026, 3, 1),
+            type="SELL",
+            isin="IE001",
+            quantity=10.0,
+            price_eur=110.0,
+        )
+    )
+    assert engine.uncovered_sells == {"IE001": 5.0}

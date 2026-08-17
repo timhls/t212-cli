@@ -33,6 +33,61 @@ def get_historical_price(ticker: str, date: datetime.date) -> Optional[float]:
     return float(hist_prices[closest_date])
 
 
+def get_quote_currency(ticker: str) -> Optional[str]:
+    """Return the quote currency of a Yahoo symbol (e.g. 'EUR', 'USD', 'GBp')."""
+    try:
+        currency = get_ticker(ticker).fast_info.get("currency")
+        return str(currency) if currency else None
+    except Exception:  # nosec B110
+        return None
+
+
+def get_fx_rate_to_eur(currency: str, date: datetime.date) -> Optional[float]:
+    """FX rate: 1 unit of `currency` = X EUR on `date`.
+
+    GBp (pence) quirk: Yahoo's ``GBpEUR=X`` actually returns the GBP→EUR
+    rate (ignoring the pence convention), so GBp rates must be divided
+    by 100 after fetching.
+    """
+    if currency == "EUR":
+        return 1.0
+    from_currency = currency
+    pence = False
+    if currency in ("GBp", "GBX"):
+        from_currency = "GBP"
+        pence = True
+    pair = f"{from_currency}EUR=X"
+    hist = get_ticker(pair).history(
+        start=(date - datetime.timedelta(days=4)).strftime("%Y-%m-%d"),
+        end=(date + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
+    )
+    if hist.empty:
+        return None
+    rate = float(hist["Close"].iloc[-1])
+    if pence:
+        rate /= 100.0
+    return rate
+
+
+def get_historical_price_eur(ticker: str, date: datetime.date) -> Optional[float]:
+    """Historical close price converted to EUR.
+
+    Uses the symbol's quote currency (via fast_info) and converts with the
+    historical FX rate. Falls back to the raw price if the currency cannot
+    be determined (assumes EUR).
+    """
+    price = get_historical_price(ticker, date)
+    if price is None:
+        return None
+    currency = get_quote_currency(ticker)
+    if currency is None or currency == "EUR":
+        return price
+    fx = get_fx_rate_to_eur(currency, date)
+    if fx is None:
+        return None
+    return price * fx
+
+
 def get_etf_funds_data(ticker: str) -> Optional[dict[str, Any]]:
     try:
         t = get_ticker(ticker)

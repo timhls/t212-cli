@@ -4,8 +4,8 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 from t212_cli.tax.config import get_instrument_config
-from t212_cli.tax.market_data import get_historical_price
 from t212_cli.tax.models import AssetClass
+from t212_cli.tax.yahoo_finance import get_historical_price_eur
 
 
 class Tranche(BaseModel):
@@ -52,6 +52,13 @@ class FifoEngine:
         # Foreign tax bucket
         self.anrechenbare_quellensteuer: float = 0.0
         self.year_anrechenbare_quellensteuer: float = 0.0
+
+        # Sells that could not be matched against inventory (missing
+        # Transfer-in data etc.) — ISIN -> uncovered quantity
+        self.uncovered_sells: Dict[str, float] = {}
+
+        # Ticker/year combos where the Vorabpauschale price fetch failed
+        self.price_fetch_failures: list[str] = []
 
     def process_event(self, event: TaxEvent) -> None:
         if event.type == "BUY":
@@ -114,6 +121,9 @@ class FifoEngine:
 
     def _handle_sell(self, event: TaxEvent) -> None:
         if event.isin not in self.inventory or not self.inventory[event.isin]:
+            self.uncovered_sells[event.isin] = (
+                self.uncovered_sells.get(event.isin, 0.0) + event.quantity
+            )
             return
 
         remaining_to_sell = event.quantity
@@ -162,8 +172,10 @@ class FifoEngine:
             # Subtract vorabpauschale
             net_gain_before_tfs = gross_gain - tranche_vorabpauschale
 
-            # §23 EStG check for Physical ETCs
-            if asset_class == AssetClass.PHYSICAL_ETC:
+            # §23 EStG check for commodity ETCs (physical AND synthetic:
+            # ETCs are no InvStG funds — BFH VIII R 4/15 treats them as
+            # sonstige Wirtschaftsgüter under §23)
+            if asset_class in (AssetClass.PHYSICAL_ETC, AssetClass.SYNTHETIC_ETC):
                 days_held = (event.date - oldest.date).days
                 if days_held > 365:
                     # > 1 year -> Tax free
@@ -179,6 +191,13 @@ class FifoEngine:
                     aktien_taxable_amount += taxable_amount
                 else:
                     sonstige_taxable_amount += taxable_amount
+
+        if remaining_to_sell > 1e-9:
+            # Sell quantity exceeded available inventory (e.g. shares
+            # transferred in from another broker missing from the data)
+            self.uncovered_sells[event.isin] = (
+                self.uncovered_sells.get(event.isin, 0.0) + remaining_to_sell
+            )
 
         # Update buckets
 
@@ -255,27 +274,47 @@ class FifoEngine:
 
             # In a real app, these should be cached or pre-fetched to avoid yfinance spam
             try:
-                start_price_year = get_historical_price(ticker, start_date)
-                end_price_year = get_historical_price(ticker, end_date)
+                start_price_year = get_historical_price_eur(ticker, start_date)
+                end_price_year = get_historical_price_eur(ticker, end_date)
             except Exception:  # nosec
+                self.price_fetch_failures.append(f"{isin} ({ticker}): fetch error")
                 continue
 
-            if start_price_year is None or end_price_year is None:
+            if end_price_year is None:
+                self.price_fetch_failures.append(
+                    f"{isin} ({ticker}): no year-end price"
+                )
+                continue
+
+            # Start-of-year price is only required for tranches acquired
+            # before the target year
+            has_pre_year_tranches = any(t.date.year < year for t in tranches)
+            if start_price_year is None and has_pre_year_tranches:
+                self.price_fetch_failures.append(
+                    f"{isin} ({ticker}): no start-of-year price"
+                )
                 continue
 
             dividends_paid = dividends_paid_by_isin.get(isin, 0.0)
             # Full-year Wertsteigerung includes dividends (§18 Abs.1 InvStG)
-            # Uses start-of-year market price, not tranche-specific price
-            full_wertsteigerung = end_price_year - start_price_year + dividends_paid
+            # Uses start-of-year market price for pre-year tranches
+            full_wertsteigerung = (
+                end_price_year - (start_price_year or 0.0) + dividends_paid
+            )
 
             for tranche in tranches:
                 # Determine start price
                 if tranche.date.year == year:
                     start_price = tranche.price_eur
                     months_prior_to_purchase = tranche.date.month - 1
+                    # §18 Abs.1 Satz 1 InvStG: for shares acquired during the
+                    # year, the acquisition price replaces the start-of-year
+                    # price — this applies to the Wertsteigerung comparison too
+                    wertsteigerung = end_price_year - tranche.price_eur + dividends_paid
                 elif tranche.date.year < year:
-                    start_price = start_price_year
+                    start_price = start_price_year or 0.0
                     months_prior_to_purchase = 0
+                    wertsteigerung = full_wertsteigerung
                 else:
                     # Bought after this year, skip
                     continue
@@ -294,7 +333,7 @@ class FifoEngine:
                 # §18 Abs.1 InvStG: Vorabpauschale = max(0, min(Basisertrag, Wertsteigerung) - Dividends)
                 # Wertsteigerung is NOT prorated for mid-year purchases
                 vorabpauschale = max(
-                    0.0, min(basisertrag, full_wertsteigerung) - dividends_paid
+                    0.0, min(basisertrag, wertsteigerung) - dividends_paid
                 )
 
                 if vorabpauschale <= 0:

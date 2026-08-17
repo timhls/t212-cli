@@ -11,7 +11,7 @@ def test_vorabpauschale() -> None:
     # Mock instrument config
     with (
         patch("t212_cli.tax.calculator.get_instrument_config") as mock_config,
-        patch("t212_cli.tax.calculator.get_historical_price") as mock_price,
+        patch("t212_cli.tax.calculator.get_historical_price_eur") as mock_price,
     ):
         mock_config.return_value = TaxInstrument(
             asset_class=AssetClass.AKTIENFONDS, tfs_quote=0.3
