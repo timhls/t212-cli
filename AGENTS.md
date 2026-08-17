@@ -97,16 +97,18 @@ the agent should consult the `t212` skill (`.agents/skills/t212/SKILL.md`).
 ├── models/
 │   └── __init__.py      # Pydantic models for API requests/responses
 └── tax/
-    ├── calculator.py    # FifoEngine for FIFO tax calculations
+    ├── calculator.py    # FifoEngine for FIFO tax calculations (§18/§19/§20/§23)
     ├── charts.py        # ASCII chart rendering (line charts, sparklines, summary tables)
     ├── config.py        # Tax configuration loading/saving
+    ├── csv_report.py    # German tax report from official T212 CSV exports
+    │                    # (Transfer-in, broken-FX repair, Vorabpauschale, §23)
     ├── history.py       # Pie historical value reconstruction (prices × qty, FX-normalized)
     ├── justetf.py       # justETF scraper + enrich_profile_with_yahoo()
     ├── market_data.py   # Re-exports get_historical_price from yahoo_finance
     ├── models.py        # Tax-specific Pydantic models (TaxInstrument, EtfProfile, etc.)
     ├── pie_analysis.py  # Pie deep-dive: aggregated holdings, regions, sectors
     ├── scraper.py       # Finanzfluss web scraping for instrument classification
-    ├── yahoo_finance.py # yfinance helper with SSL workaround (session, funds data)
+    ├── yahoo_finance.py # yfinance helper with SSL workaround + FX/EUR price conversion
     └── yahoo_symbols.py # ISIN → Yahoo Finance ticker resolver (curated map + search fallback)
 ```
 
@@ -127,10 +129,22 @@ CLI commands: get client → call method → pretty-print → catch errors.
 
 ### Tax Module (German Tax Reporting)
 
-- **FifoEngine**: FIFO calculator for capital gains
-- **Market data**: Historical prices via yfinance
+- **FifoEngine**: FIFO calculator for capital gains (§20/§23 buckets,
+  Teilfreistellung, loss pots, Vorabpauschale §18 incl. acquisition-price
+  substitution for in-year buys, uncovered-sell tracking)
+- **csv_report**: `t212 tax csv-report <export.csv> <year>` — German tax
+  report from the official CSV export. **CSV is the authoritative source**
+  for tax: the Public API omits `Transfer in` fills, silently breaking FIFO.
+  Handles broken FX rows (Exchange rate = 1.0) via Result-derivation or
+  historical FX fallback, resolves Vorabpauschale symbols, sums
+  interest/lending/cashback. Always emits warnings for unreliable data.
+- **Market data**: Historical prices via yfinance, EUR-normalized via
+  `get_historical_price_eur()` (FX conversion, GBp quirk)
 - **Config system**: Stores instrument classifications locally
-- **Scraper**: Auto-detects fund types (thesaurierend/ausschüttend)
+- **Scraper**: Auto-detects fund types (thesaurierend/ausschüttend) — verify
+  auto-classifications for large positions (scraper occasionally mislabels,
+  e.g. UCITS equity REIT ETF as Immobilienfonds/60% TFS instead of
+  Aktienfonds/30%)
 
 ### Pie History Module
 

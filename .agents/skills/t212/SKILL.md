@@ -10,7 +10,7 @@ compatibility: Requires Python 3.14+, uv, and Trading 212 API credentials
   (T212_API_KEY_ID, T212_SECRET_KEY).
 metadata:
   author: timoh
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 ## When to use
@@ -20,7 +20,9 @@ metadata:
 - **Orders**: "Place a market buy for 10 shares of AAPL", "Cancel order 12345",
   "Place a limit order", "Set a stop-loss", "Place a stop-limit order"
 - **History**: "Show my transactions", "What dividends did I receive?"
-- **Tax reporting**: "Generate German tax report for 2024"
+- **Tax reporting**: "Generate German tax report for 2025" — use
+  `tax csv-report` with the official CSV export (authoritative; covers
+  Transfer-in securities transfers which the API omits)
 - **Pies**: "List my pies", "Create a new pie", "Analyze pie holdings"
 - **ETF analysis**: "Analyze ISIN with justETF and Yahoo Finance", "Get ETF holdings"
 - **212 Card transactions**: "Show my card spending", "What did I spend on the card?"
@@ -166,6 +168,28 @@ uv run t212 pies duplicate 12345 '{"name":"Copy of Tech"}'
 
 ### German Tax Reporting
 
+**Preferred workflow — CSV export** (authoritative data source): export the
+full account history from the T212 app (Account → History → Export) or via
+`t212 history exports request`, then run the CSV-based report. The CSV
+includes `Transfer in` rows (securities transfers from other brokers) which
+the Public API does not return — FIFO matching via the API silently misses
+those positions.
+
+```bash
+# German tax report from an official CSV export (covers Transfer-in,
+# broken FX repair, Vorabpauschale incl. symbol resolution, §23 for ETCs,
+# interest/lending/cashback sums)
+uv run t212 tax csv-report ~/Downloads/export_2025.csv 2025
+
+# Override the Basiszins for years not built in (2023-2025 known)
+uv run t212 tax csv-report ~/Downloads/export_2026.csv 2026 --basiszins 0.032
+
+# Also show year-end holdings with FIFO cost
+uv run t212 tax csv-report ~/Downloads/export_2025.csv 2025 --inventory
+```
+
+**API-based report** (no transfers — warns loudly if sells are uncovered):
+
 ```bash
 # Classify an instrument (auto-detect fund type)
 uv run t212 tax classify IE00BJ0KDQ92
@@ -173,9 +197,18 @@ uv run t212 tax classify IE00BJ0KDQ92
 # View local tax config
 uv run t212 tax config
 
-# Generate FiFo tax report for a year
+# Generate FiFo tax report for a year from API orders
 uv run t212 tax fifo-report --year 2024
 ```
+
+**CSV export action vocabulary** (seen in real exports): `Deposit`,
+`Withdrawal`, `Market buy`, `Limit buy`, `Market sell`, `Limit sell`,
+`Transfer in`, `Card debit`, `Card ATM Withdrawal`, `Interest on cash`,
+`Lending interest` (share lending), `Spending cashback`, `Dividend`
+(`Total` = paid/net amount in account currency; Gross/Tax only in `Notes`,
+quoted in trade currency). Card rows include **Merchant name** and
+**Merchant category** columns — merchant data is available in CSV exports
+even though the API omits it.
 
 ### ETF Profile
 
@@ -243,10 +276,17 @@ purchases"), the agent should:
 1. Explain that the API does not expose merchant-level data
 2. Direct the user to the **T212 app → Cards tab** where merchant names,
    locations, cashback, and fees are visible
-3. Mention that CSV/PDF statement exports from the app may contain more detail
+3. Mention that the **CSV export** (app: Account → History → Export, or
+   `POST /equity/history/exports`) **does include `Merchant name` and
+   `Merchant category` columns** for card rows — a CSV export answers
+   merchant-level questions that the API cannot
 
 ### Other API Gaps
 
+- **No securities transfer data**: `Transfer in` events (positions moved from
+  another broker) do not appear as rated fills in `GET /equity/history/orders`.
+  API-based FIFO reports silently miss them (the CLI now warns); use the CSV
+  export + `tax csv-report` instead
 - **No multi-currency support**: All values in primary account currency only
 - **No CFD account support**: API is Invest/ISA only
 - **No card management endpoints**: No API to freeze/unfreeze cards, set PIN,
@@ -386,6 +426,29 @@ The tax/FIFO engine in `tax/calculator.py` reads `fill.walletImpact.taxes` and
 16. **Pie cash not on detailed response**: `get_pie_by_id()` returns no cash
     field. `tax/history.py:fetch_pie_history()` fetches cash via
     `get_pies()` and matches by ID.
+17. **CSV exports can contain broken FX rows**: Some USD trades (observed
+    with extended-hours buys) carry `Exchange rate = 1.0` and no EUR
+    conversion. `tax csv-report` repairs these automatically: single-lot
+    positions get the EUR basis derived from the official `Result` column
+    (exact); otherwise a historical `{CUR}EUR=X` rate is used (approximate,
+    flagged in warnings). Verify flagged rows before filing.
+18. **Transfer-in valuation is provisional**: CSV `Transfer in` rows are
+    booked at the transfer valuation on the transfer date. The true FIFO
+    basis is the original acquisition at the outgoing broker — fetch the
+    outgoing broker's depot report to correct gains that involve
+    transferred shares (usually cent-sized differences).
+19. **Verify auto-scraped classifications**: The Finanzfluss scraper can
+    mislabel funds (observed: a UCITS equity REIT ETF classified as
+    Immobilienfonds with 60% TFS instead of Aktienfonds with 30%). Check
+    `~/.t212/tax_config.yml` (`t212 tax config`) for anything affecting
+    large positions. Synthetic commodity ETCs belong in asset class
+    `Synthetic ETC` (§23, TFS 0%).
+20. **Vorabpauschale needs EUR-quoted prices**: The engine resolves ISINs
+    to Yahoo symbols and converts non-EUR listings via
+    `get_historical_price_eur()` (handles GBp/100 and USD→EUR). If no
+    symbol resolves at all, that ISIN's Vorabpauschale is skipped with a
+    warning — cross-check manually (a same-day T212 buy price is a good
+    31.12.-proxy).
 
 ## Tax Module (German Tax Reporting)
 
@@ -407,7 +470,18 @@ reference for the exact legal basis (§20 EStG, §23 EStG, InvStG).
 - **Config**: Stores instrument classifications locally at `~/.t212/tax_config.yml`
 - **Vorabpauschale**: §18 InvStG preliminary lump-sum calculation for
   thesaurierende/teilthesaurierende Fonds, taxed at year end on first business
-  day of the following year
+  day of the following year. For in-year acquisitions the Wertsteigerung is
+  measured from the acquisition price (§18 Abs.1 Satz 1), not from the
+  start-of-year price. Prices are fetched EUR-normalized (FX conversion for
+  non-EUR Yahoo listings, GBp quirk handled)
+- **CSV tax report** (`tax csv-report`): Full German report from the official
+  CSV export — FIFO including `Transfer in`, automatic repair of broken FX
+  rows, §20/§23 buckets, Vorabpauschale with ISIN→Yahoo symbol resolution,
+  interest/lending/cashback sums, and explicit warnings for anything
+  unreliable (uncovered sells, skipped Vorabpauschale, approximated bases)
+- **Uncovered-sell tracking**: Sells exceeding known inventory (typically
+  missing Transfer-in data) are recorded in `engine.uncovered_sells` and
+  reported instead of being silently dropped
 
 ### Key rules implemented (per reference)
 
@@ -421,6 +495,8 @@ reference for the exact legal basis (§20 EStG, §23 EStG, InvStG).
 | Teilfreistellung 30%/15%/0% | §20 InvStG | "Investmentfonds" |
 | Vorabpauschale basiszins + 70% factor | §18 Abs.1 InvStG | Formula section |
 | 1/12 rule for mid-year purchases | §18 Abs.2 InvStG | Formula section |
+| Wertsteigerung measured from acquisition for in-year buys | §18 Abs.1 Satz 1 InvStG | Formula section |
+| Synthetic commodity ETCs = §23 (TFS 0%, not InvStG) | BFH VIII R 4/15 | "Gold-ETCs" |
 | Vorabpauschale deducted at sale without TFS | §19 Abs.1 Satz 4 InvStG | Formula section |
 | FIFO mandatory for crypto | §23 Abs.1 Satz 1 Nr.2 Satz 3 EStG | "Bitcoin" |
 | Gold-ETC with delivery = §23 (tax-free >1yr) | BFH VIII R 4/15 | "Gold-ETCs" |
@@ -429,8 +505,12 @@ reference for the exact legal basis (§20 EStG, §23 EStG, InvStG).
 
 | Year | Basiszins | Tax due |
 |------|-----------|---------|
+| 2023 | 2.55% | 2 Jan 2024 |
+| 2024 | 2.29% | 2 Jan 2025 |
 | 2025 | 2.53% | 2 Jan 2026 |
 | 2026 | 3.20% | 4 Jan 2027 |
+
+`tax csv-report` has 2023–2025 built in; pass `--basiszins` for other years.
 
 ## ETF Data
 
