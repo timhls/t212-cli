@@ -1,5 +1,7 @@
 import datetime
 import os
+from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -12,6 +14,7 @@ from t212_cli.tax.config import (
     load_tax_config,
     update_instrument_config,
 )
+from t212_cli.tax.csv_report import generate_csv_tax_report
 from t212_cli.tax.scraper import scrape_finanzfluss
 
 app = typer.Typer(help="German Tax Reporting Commands (FiFo, TFS, Vorabpauschale)")
@@ -159,6 +162,19 @@ def generate_fifo_report(year: int = 2024) -> None:
     for event in events:
         engine.process_event(event)
 
+    if engine.uncovered_sells:
+        console.print(
+            f"\n[bold red]WARNING:[/bold red] {len(engine.uncovered_sells)} "
+            "instrument(s) with sells not covered by API orders:"
+        )
+        for isin, qty in engine.uncovered_sells.items():
+            console.print(f"  [red]- {isin}: {qty:.6f} shares unmatched[/red]")
+        console.print(
+            "[yellow]The T212 API does not return 'Transfer in' (securities "
+            "transfers) as rated fills. Use the official CSV export with "
+            "'t212 tax csv-report' for correct results.[/yellow]"
+        )
+
     console.print("[dim]- Calculating Loss Buckets...[/dim]")
 
     # Print report
@@ -191,3 +207,113 @@ def generate_fifo_report(year: int = 2024) -> None:
     console.print(
         "\n[dim]Note: This report assumes account base currency is EUR and does not yet include Dividends, Vorabpauschale, or daily interest payouts (Interest on Cash).[/dim]"
     )
+
+
+@app.command("csv-report")
+def csv_report(
+    path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, help="Official T212 CSV export"
+    ),
+    year: int = typer.Argument(..., help="Tax year"),
+    basiszins: Optional[float] = typer.Option(
+        None, help="Basiszins override (default: 2023-2025 built-in)"
+    ),
+    show_inventory: bool = typer.Option(
+        False, "--inventory", help="Show year-end holdings table"
+    ),
+) -> None:
+    """German tax report from an official CSV export (covers Transfer-in)."""
+    try:
+        report = generate_csv_tax_report(path, year, basiszins=basiszins)
+    except (ValueError, OSError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1) from e
+
+    console.print(f"\n[bold underline]CSV Tax Report {year}[/bold underline]")
+    console.print(
+        f"[dim]Source: {path.name} · Basiszins: {report.basiszins:.2%}[/dim]\n"
+    )
+
+    summary = Table(show_header=True, header_style="bold magenta")
+    summary.add_column("Category", style="cyan")
+    summary.add_column("Amount (EUR)", justify="right")
+    interest = report.cash_sums.get("Interest on cash", 0.0) + report.cash_sums.get(
+        "Lending interest", 0.0
+    )
+    summary.add_row(
+        "Realized gains §20 (net, incl. TFS)", f"{report.fifo_taxable_gains:.2f} €"
+    )
+    summary.add_row("  of which Aktiengewinne/verluste (see below)", "")
+    summary.add_row("Vorabpauschale (taxable)", f"{report.vorab_taxable_total:.2f} €")
+    summary.add_row("Interest on cash + lending", f"{interest:.2f} €")
+    summary.add_row(
+        "[bold]Total §20 taxable (year)[/bold]",
+        f"[bold]{report.year_taxable_gains_with_vorab:.2f} €[/bold]",
+    )
+    summary.add_row(
+        "§23 gains (ETCs, check 1.000 € Freigrenze)", f"{report.sec23_gains:.2f} €"
+    )
+    summary.add_row("Aktien losses generated", f"{report.aktien_verluste:.2f} €")
+    summary.add_row("Sonstige losses generated", f"{report.sonstige_verluste:.2f} €")
+    if report.cash_sums.get("Spending cashback"):
+        summary.add_row(
+            "Spending cashback (document only)",
+            f"{report.cash_sums['Spending cashback']:.2f} €",
+        )
+    console.print(summary)
+
+    if report.sells:
+        console.print("\n[bold]Sells[/bold]")
+        sells_table = Table(show_header=True, header_style="bold magenta")
+        sells_table.add_column("Date")
+        sells_table.add_column("Ticker")
+        sells_table.add_column("Qty", justify="right")
+        sells_table.add_column("Proceeds €", justify="right")
+        sells_table.add_column("T212 Result €", justify="right")
+        sells_table.add_column("Class")
+        for s in report.sells:
+            sells_table.add_row(
+                s.date.date().isoformat(),
+                s.ticker,
+                f"{s.quantity:.6f}",
+                f"{s.net_proceeds_eur:.2f}",
+                f"{s.t212_result_eur:.2f}",
+                s.asset_class,
+            )
+        console.print(sells_table)
+
+    if report.vorab_rows:
+        console.print("\n[bold]Vorabpauschale[/bold]")
+        vorab_table = Table(show_header=True, header_style="bold magenta")
+        vorab_table.add_column("ISIN")
+        vorab_table.add_column("Qty", justify="right")
+        vorab_table.add_column("Gross €", justify="right")
+        vorab_table.add_column("TFS", justify="right")
+        vorab_table.add_column("Taxable €", justify="right")
+        for v in report.vorab_rows:
+            vorab_table.add_row(
+                v.isin,
+                f"{v.quantity:.4f}",
+                f"{v.gross:.2f}",
+                f"{v.tfs_quote:.0%}",
+                f"{v.taxable:.2f}",
+            )
+        console.print(vorab_table)
+
+    if show_inventory and report.inventory:
+        console.print("\n[bold]Inventory (year end)[/bold]")
+        inv_table = Table(show_header=True, header_style="bold magenta")
+        inv_table.add_column("ISIN")
+        inv_table.add_column("Name")
+        inv_table.add_column("Qty", justify="right")
+        inv_table.add_column("Cost €", justify="right")
+        for i in report.inventory:
+            inv_table.add_row(
+                i.isin, i.name[:40], f"{i.quantity:.6f}", f"{i.cost_eur:.2f}"
+            )
+        console.print(inv_table)
+
+    if report.warnings:
+        console.print("\n[bold yellow]Warnings[/bold yellow]")
+        for w in report.warnings:
+            console.print(f"[yellow]- {w}[/yellow]")
