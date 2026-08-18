@@ -35,7 +35,12 @@ def _mock_client(transactions: list[CardTransaction]) -> MagicMock:
 
 
 def test_help_lists_transactions() -> None:
-    result = runner.invoke(app, ["transactions", "--help"])
+    # NO_COLOR + wide COLUMNS keeps rich output plain and unwrapped in CI
+    result = runner.invoke(
+        app,
+        ["transactions", "--help"],
+        env={"NO_COLOR": "1", "COLUMNS": "200"},
+    )
     assert result.exit_code == 0
     assert "--from" in result.stdout
     assert "--cookie-file" in result.stdout
