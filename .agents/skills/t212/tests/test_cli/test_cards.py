@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -9,6 +10,14 @@ from t212_cli.models.cards import CardTransaction
 from typer.testing import CliRunner
 
 runner = CliRunner()
+
+# rich force-enables ANSI colors under GITHUB_ACTIONS; strip them before asserting
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
 
 COOKIE_ENV = {"T212_CARDS_COOKIES": "TRADING212_SESSION_LIVE=abc123"}
 
@@ -35,15 +44,11 @@ def _mock_client(transactions: list[CardTransaction]) -> MagicMock:
 
 
 def test_help_lists_transactions() -> None:
-    # NO_COLOR + wide COLUMNS keeps rich output plain and unwrapped in CI
-    result = runner.invoke(
-        app,
-        ["transactions", "--help"],
-        env={"NO_COLOR": "1", "COLUMNS": "200"},
-    )
+    result = runner.invoke(app, ["transactions", "--help"])
     assert result.exit_code == 0
-    assert "--from" in result.stdout
-    assert "--cookie-file" in result.stdout
+    plain = _plain(result.stdout)
+    assert "--from" in plain
+    assert "--cookie-file" in plain
 
 
 def test_missing_cookies_errors_cleanly() -> None:
