@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 import typer
 from rich.console import Console
+from t212_cli.cli.cards import app as cards_app
 from t212_cli.cli.tax import app as tax_app
 from t212_cli.client.base import Trading212Client
 from t212_cli.models import (
@@ -43,6 +44,7 @@ pies_app = typer.Typer(help="Manage investment pies")
 positions_app = typer.Typer(help="Manage open positions")
 
 app.add_typer(account_app, name="account")
+app.add_typer(cards_app, name="cards")
 app.add_typer(etf_app, name="etf")
 app.add_typer(history_app, name="history")
 app.add_typer(metadata_app, name="metadata")

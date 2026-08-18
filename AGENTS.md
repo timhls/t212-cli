@@ -89,13 +89,17 @@ the agent should consult the `t212` skill (`.agents/skills/t212/SKILL.md`).
 ```
 .agents/skills/t212/scripts/t212_cli/
 ├── __main__.py          # Entry point, imports app from cli/main.py
+├── card_report.py       # Markdown/CSV renderers + summarize() for card transactions
 ├── cli/
+│   ├── cards.py         # `cards` sub-app: transactions from the private cards API
 │   ├── main.py          # Main Typer app with sub-apps (account, etf, orders, pies, etc.)
 │   └── tax.py           # German tax reporting commands (separate Typer sub-app)
 ├── client/
-│   └── base.py          # Trading212Client - HTTP wrapper + cached ticker/ISIN resolution
+│   ├── base.py          # Trading212Client - HTTP wrapper + cached ticker/ISIN resolution
+│   └── cards.py         # CardsClient - private cards API (cookie auth, cursor pagination)
 ├── models/
-│   └── __init__.py      # Pydantic models for API requests/responses
+│   ├── __init__.py      # Pydantic models for API requests/responses (datamodel-codegen)
+│   └── cards.py         # Card transaction models (hand-written; private cards API)
 └── tax/
     ├── calculator.py    # FifoEngine for FIFO tax calculations (§18/§19/§20/§23)
     ├── charts.py        # ASCII chart rendering (line charts, sparklines, summary tables)

@@ -10,7 +10,7 @@ compatibility: Requires Python 3.14+, uv, and Trading 212 API credentials
   (T212_API_KEY_ID, T212_SECRET_KEY).
 metadata:
   author: timoh
-  version: "1.4.0"
+  version: "1.6.0"
 ---
 
 ## When to use
@@ -25,8 +25,9 @@ metadata:
   Transfer-in securities transfers which the API omits)
 - **Pies**: "List my pies", "Create a new pie", "Analyze pie holdings"
 - **ETF analysis**: "Analyze ISIN with justETF and Yahoo Finance", "Get ETF holdings"
-- **212 Card transactions**: "Show my card spending", "What did I spend on the card?"
-  (Note: the API only exposes anonymous ledger entries — see API Limitations below)
+- **212 Card transactions**: "Show my card spending", "What did I spend on the card?",
+  "Get all card transactions for 2025" — use `cards transactions` with browser
+  session cookies (see **212 Card transactions** under How to invoke)
 
 ## How to invoke
 
@@ -110,6 +111,30 @@ uv run t212 history exports request 2024-01-01T00:00:00Z 2024-12-31T23:59:59Z --
 # Exclude sections (orders/dividends/transactions included by default, interest excluded)
 uv run t212 history exports request 2024-01-01T00:00:00Z 2024-12-31T23:59:59Z \
     --no-dividends --include-interest
+```
+
+### 212 Card transactions
+
+Fetches full card transaction details (merchant, category, status, cashback,
+FX, ATM fees) from Trading 212's **private cards web API** — data the public
+API does not expose. Requires **browser session cookies** from a logged-in
+web app session (live accounts only; the public API key does not work here).
+
+```bash
+# Export cookies from an authenticated browser session (playwright-cli)
+playwright-cli state-save /tmp/t212-state.json
+
+# Fetch 2025 card transactions as a tax-document style markdown report
+uv run t212 cards transactions --from 2025-01-01 --to 2025-12-31 \
+    --cookie-file /tmp/t212-state.json --format md > card-2025.md
+
+# Raw JSON (default) or CSV
+uv run t212 cards transactions --from 2025-01-01 --to 2025-12-31 --cookie-file /tmp/t212-state.json
+uv run t212 cards transactions --from 2025-01-01 --to 2025-12-31 --cookie-file /tmp/t212-state.json --format csv
+
+# Alternatives to --cookie-file: --cookie "TRADING212_SESSION_LIVE=...; LOGIN_TOKEN=..."
+# or env vars T212_CARDS_COOKIE_FILE / T212_CARDS_COOKIES
+# --tz (default Europe/Berlin) defines the calendar-day boundaries of --from/--to
 ```
 
 ### Metadata
@@ -247,17 +272,25 @@ The API uses HTTP Basic Auth. Credentials are Base64-encoded as
 `api_key_id:secret_key` and sent in the `Authorization` header. The client
 handles this automatically.
 
+**Exception — `cards` commands**: The private cards API does not accept API
+keys. `t212 cards transactions` authenticates with browser session cookies
+(`TRADING212_SESSION_LIVE` + `LOGIN_TOKEN`), supplied via `--cookie-file`
+(Playwright storage state, e.g. `playwright-cli state-save <file>`),
+`--cookie` (raw header), or `T212_CARDS_COOKIE_FILE` / `T212_CARDS_COOKIES`
+env vars. Cookie expiry surfaces as a clear "session has expired" error.
+
 ## API Limitations
 
 The Trading 212 Public API is in **beta** and only covers **Invest** and
 **Stocks ISA** account types. Key limitations the agent must be aware of:
 
-### No Card Transaction Details
+### No Card Transaction Details (Public API)
 
 Trading 212 offers a **212 Card** (debit card issued by Paynetics UK Ltd.)
 that spends directly from the investment account cash balance. Card
-transactions **do appear** in the transaction history endpoint, but the API
-provides **no merchant names, categories, locations, or card metadata**.
+transactions **do appear** in the public transaction history endpoint, but
+that API provides **no merchant names, categories, locations, or card
+metadata**.
 
 The `GET /equity/history/transactions` endpoint returns only:
 
@@ -271,15 +304,18 @@ The `GET /equity/history/transactions` endpoint returns only:
 
 The API description itself says **"Fetch superficial information"**.
 
-**If a user asks about card spending details** (e.g., "find my Alibaba
-purchases"), the agent should:
-1. Explain that the API does not expose merchant-level data
-2. Direct the user to the **T212 app → Cards tab** where merchant names,
-   locations, cashback, and fees are visible
-3. Mention that the **CSV export** (app: Account → History → Export, or
-   `POST /equity/history/exports`) **does include `Merchant name` and
-   `Merchant category` columns** for card rows — a CSV export answers
-   merchant-level questions that the API cannot
+**Full card details are available via `t212 cards transactions`**, which
+calls the private web-app cards API (`live.services.trading212.com/rest/cards/v1`)
+with browser session cookies (see **212 Card transactions** under How to
+invoke). Per-transaction data includes merchant name/category/country,
+type (`PURCHASE`/`ATM_WITHDRAWAL`/`CARD_VERIFICATION`/`REFUND`), status
+(`COMPLETED`/`DECLINED`/`REVERTED`), cashback, round-ups, FX conversion,
+and ATM fees.
+
+If cookie-based access is not possible (no logged-in browser session), the
+**CSV export** (app: Account → History → Export, or
+`POST /equity/history/exports`) also includes `Merchant name` and
+`Merchant category` columns for card rows.
 
 ### Other API Gaps
 
@@ -400,11 +436,15 @@ The tax/FIFO engine in `tax/calculator.py` reads `fill.walletImpact.taxes` and
     (ranked by effective pie weight), `countries`, `sectors`,
     `etf_profiles`, and `components_without_data`. Only top-10 holdings per
     ETF are visible via justETF; the rest is in the undisclosed tail.
-11. **Card transactions have no merchant data**: The 212 Card exists as a
-    product, but the API exposes card spends only as anonymous `WITHDRAW`
-    entries with a UUID reference. No merchant name, category, or location
-    is available via the API. Direct users to the T212 app for card
-    transaction details.
+11. **Card transactions via the public API have no merchant data**: The public
+    API exposes card spends only as anonymous `WITHDRAW` entries with a UUID
+    reference. For merchant-level detail use `t212 cards transactions`
+    (private cards API, browser session cookies required — see
+    **212 Card transactions** under How to invoke) or the CSV export.
+    Cards-API gotchas: `pageSize` max **50** (`400` above), cursor pagination
+    (`cursorId` = last item's `id`), timestamps are **UTC** (`--tz` converts
+    boundaries/display), 401/403 means the browser session expired
+    (re-login + re-export cookies), live accounts only.
 12. **Transactions endpoint returns superficial data**: The API literally
     describes the endpoint as "superficial information". If a user needs
     detailed transaction data, suggest CSV exports via the app or

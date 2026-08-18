@@ -10,6 +10,8 @@ A Python client and CLI for the Trading 212 API.
 - **Orders**: List, get, cancel, and place market orders. Limit and stop orders are supported by the API but not exposed in the CLI.
 - **Pies**: Create, update, duplicate, and delete investment pies from JSON payloads.
 - **History**: View historical events like dividends, exports, orders, and transactions.
+- **212 Card**: Fetch card transactions (merchant, category, status, cashback) for a
+  date range via the web-app cards API — requires browser session cookies, not API keys.
 
 ## Installation
 
