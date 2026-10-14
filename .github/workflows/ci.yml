@@ -17,6 +17,8 @@ jobs:
   analyze-and-test:
     name: Lint, Scan, and Test
     runs-on: arc-runner-set-t212-cli
+        env:
+          UV_PYTHON: "3.14"
 
     steps:
       # 1. Check out the code
