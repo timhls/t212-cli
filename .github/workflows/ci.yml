@@ -32,7 +32,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.15' # Matches project version
+          python-version: '3.14'
 
       # 3. Install dependencies and our tools
       - name: Install Dependencies
