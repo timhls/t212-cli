@@ -30,6 +30,30 @@ We use `uv` exclusively for running all commands. Do not use standard `pip` or `
 - **Run the CLI:** `uv run t212 <command>`
 - **Example:** `uv run t212 --help`
 
+### Coder Workspace (Linux) Notes
+
+The repo also lives on the Coder workspace, where the shared `uv` defaults
+point at root-owned paths and traffic is MITM-proxied. Work around both by
+overriding the environment:
+
+```bash
+export UV_PYTHON_INSTALL_DIR="$HOME/.local/share/uv-python"
+export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/t212"
+export SSL_CERT_FILE=/tmp/homelab-bundle.pem   # concatenation of the
+                                               # homelab root CA and the
+                                               # system CA bundle
+uv sync
+"$HOME/.venvs/t212/bin/t212" --help
+```
+
+`SSL_CERT_FILE` normally points at the homelab root CA only
+(`/etc/homelab-ca/rootCA.pem`), which makes `uv` reject the
+`python-build-standalone` download from GitHub; the combined bundle fixes
+certificate validation. The workspace has no KeePassXC, no `.kdbx` database,
+and no `T212_*` credentials — the tracked `.envrc` targets the macOS machine
+(`osascript` dialog + `keepassxc-cli`), so provide credentials some other way
+before running commands against the API.
+
 ### Skill Structure
 - **Skill path:** `.agents/skills/t212/`
 - **Source code:** `.agents/skills/t212/scripts/t212_cli/`

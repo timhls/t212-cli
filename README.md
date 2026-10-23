@@ -29,16 +29,15 @@ uv pip install t212-cli
 
 ## Setup
 
-The CLI requires a Trading 212 API key ID and secret key. You can provide these in two ways:
+The CLI reads API credentials from the `T212_API_KEY_ID` and `T212_SECRET_KEY`
+environment variables:
 
-1. **Environment Variables**: Set the `T212_API_KEY_ID` and `T212_SECRET_KEY` environment variables.
+```bash
+export T212_API_KEY_ID="your-api-key-id"
+export T212_SECRET_KEY="your-secret-key"
+```
 
-   ```bash
-   export T212_API_KEY_ID="your-api-key-id"
-   export T212_SECRET_KEY="your-secret-key"
-   ```
-
-2. **Environment Variables**: The CLI reads API credentials from environment variables `T212_API_KEY_ID` and `T212_SECRET_KEY`. Optionally, `T212_BASE_URL` can specify the API endpoint (defaults to demo).
+Optionally, `T212_BASE_URL` can specify the API endpoint (defaults to demo).
 
 ### API Environment Selection
 
