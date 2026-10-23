@@ -7,6 +7,9 @@
 # opencode local artifacts
 .opencode/
 
+# Playwright CLI artifacts
+.playwright-cli/
+
 # Python
 __pycache__/
 *.py[cod]
