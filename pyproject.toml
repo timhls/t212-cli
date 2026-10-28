@@ -67,7 +67,7 @@ dev = [
     "pytest==9.2.0",
     "pytest-mock==3.17.0",
     "ruff==0.17.3",
-    "mypy==2.4.0",
+    "mypy==2.4.1",
     "python-semantic-release==10.7.0",
     "types-requests==2.33.0.20261006",
     "bandit==1.9.4",
